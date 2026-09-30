@@ -1,8 +1,7 @@
 // 日志系统 + 多语言系统 冒烟测试
 //
 // 构建（可直接用 tools/build_utils_test.sh）：
-//   c++ -std=c++17 -Wall -Wextra -I src/utils \
-//       -I third_party/spdlog/include -I third_party/json/include \
+//   c++ -std=c++17 -Wall -Wextra -I src/utils -I third_party/spdlog/include \
 //       src/utils/log/Logger.cpp src/utils/i18n/I18n.cpp tests/utils_smoke.cpp -o tests/utils_smoke
 // 运行：在仓库根目录执行 ./tests/utils_smoke（语言文件按 resources/lang 相对路径加载）
 
@@ -72,19 +71,12 @@ void TestI18n() {
     Check(textLoaded == 2, "加载 resources/lang 下 2 个文本语言表");
 
     const std::size_t jsonLoaded = tr.LoadDirectory("resources/lang", ".json");
-    const bool jsonOk = i18n::Translator::JsonAvailable();
-    if (jsonOk) {
-        Check(jsonLoaded == 1, "加载 JSON 语言表 ja_JP.json");
-    } else {
-        Check(jsonLoaded == 0, "未包含 nlohmann/json，JSON 表被跳过（降级为文本表）");
-    }
-    Check(tr.Locales().size() == (jsonOk ? 3u : 2u), "语言列表数量正确");
+    Check(jsonLoaded == 1, "加载 1 个 JSON 风格语言表 ja_JP.json");
+    Check(tr.Locales().size() == 3, "语言列表包含 3 种语言");
 
-    if (jsonOk) {
-        Check(tr.SetLocale("ja_JP"), "切换到 ja_JP（JSON 表）");
-        Check(tr.Tr("menu.library") == "ライブラリ", "JSON 嵌套对象展平为点分 key");
-        Check(tr.Tr("greeting", "プレイヤー") == "こんにちは、プレイヤー", "JSON 表里的占位符同样生效");
-    }
+    Check(tr.SetLocale("ja_JP"), "切换到 ja_JP（JSON 风格表）");
+    Check(tr.Tr("menu.library") == "ライブラリ", "JSON 风格表取值正确");
+    Check(tr.Tr("greeting", "プレイヤー") == "こんにちは、プレイヤー", "JSON 风格表里的占位符同样生效");
 
     Check(tr.SetLocale("zh_CN"), "切换到 zh_CN");
     Check(tr.Tr("app.name") == "饺子皮", "中文取值正确");
@@ -111,6 +103,47 @@ void TestI18n() {
     i18n::Translator::Default().SetLocale("zh_CN");
     Check(i18n::Tr("app.tagline") == "多核心模拟器前端", "全局便捷接口 i18n::Tr");
     Check(i18n::Tr("menu.cores") == "核心管理", "全局便捷接口：无参数");
+}
+
+// 自制语言表解析器的边界用例
+void TestParser() {
+    std::printf("[i18n 解析器]\n");
+    MAKE_DIR("tests/tmp_utils_test");
+    const std::string path = "tests/tmp_utils_test/parser.json";
+
+    const std::string content = R"JSON(// 行注释
+# 另一种注释
+{
+  "t.quoted": "带,逗号和 # 号的值",
+  "t.escape": "第一行\n第二行",
+  "t.raw" : 无引号值 ,
+  t.equal = 等号也算 ,
+  "t.unicode": "\u4E2D\u6587",
+  "t.nested": {
+  "t.orphan": "嵌套子键会落到顶层"
+}
+)JSON";
+
+    std::FILE* file = std::fopen(path.c_str(), "wb");
+    if (file == nullptr) {
+        Check(false, "写入临时语言表");
+        return;
+    }
+    std::fwrite(content.data(), 1, content.size(), file);
+    std::fclose(file);
+
+    i18n::Translator tr;
+    tr.SetFallbackLocale("zz_ZZ");
+    Check(tr.LoadFile("zz_ZZ", path), "加载混合写法的语言表");
+    Check(tr.Tr("t.quoted") == "带,逗号和 # 号的值", "引号值里的逗号与 # 不被截断");
+    Check(tr.Tr("t.escape") == "第一行\n第二行", "转义 \\n 生效");
+    Check(tr.Tr("t.raw") == "无引号值", "无引号值 + 末尾逗号可解析");
+    Check(tr.Tr("t.equal") == "等号也算", "= 写法同样可解析");
+    Check(tr.Tr("t.unicode") == "中文", "\\uXXXX 转成 UTF-8");
+    Check(!tr.Has("t.nested"), "嵌套对象那一行被忽略");
+    Check(tr.Has("t.orphan"), "嵌套子键会落到顶层（层级请改用点分 key）");
+
+    std::remove(path.c_str());
 }
 
 void TestLogger() {
@@ -218,6 +251,7 @@ void TestLogger() {
 
 int main() {
     TestI18n();
+    TestParser();
     TestLogger();
     std::printf("\n%s（失败 %d 项）\n", g_failures == 0 ? "ALL PASS" : "FAILED", g_failures);
     return g_failures == 0 ? 0 : 1;

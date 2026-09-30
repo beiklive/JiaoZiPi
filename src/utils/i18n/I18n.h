@@ -2,24 +2,20 @@
 
 // 通用多语言系统（独立模块，不依赖宿主项目）
 //
-// - 语言表来自 UTF-8 文件，两种格式自动识别：
-//     · 文本：`key = value`（默认）
-//     · JSON：对象嵌套按 `.` 展平，如 {"menu": {"library": "游戏库"}} → menu.library
-//   也可运行时注册（把翻译编进二进制）
+// - 语言表来自 UTF-8 文件，两种写法都能读（自制解析器，无第三方依赖）：
+//     · 文本表：  app.name = 饺子皮
+//     · JSON 风格："app.name": "饺子皮",
+//   两种写法可混用；引号、逗号、花括号可省略，注释支持 # ; //
+// - 也可运行时注册（把翻译编进二进制）
 // - 查找链：当前语言 → 当前语言的语言前缀（zh_CN → zh）→ 回退语言 → key 本身
 // - 支持 `{}` 占位符格式化，支持缺失 key 统计，便于查漏
-// - 线程安全；C++17
-// - 依赖：format/StrFormat.h（header-only）；JSON 解析依赖 third_party/nlohmann/json，
-//   用 `__has_include` 探测：没有该头文件时自动降级为仅支持文本表，其余功能不受影响
+// - 线程安全；C++17；仅依赖同仓库的 format/StrFormat.h（header-only）
 //
-// 语言文件格式（UTF-8）：
-//   # 注释
-//   app.title = 饺子皮
-//   greeting = 欢迎使用 {}      <- 占位符用 {} 顺序填充，不需要填序号
+// 解析器限制：行式、扁平 key，不支持嵌套对象与数组（层级用点分 key 表达，
+// 如 menu.library）；转义支持 \n \t \r \b \f \" \/ \\ 与 \uXXXX（BMP）。
 //
 // 迁移到其他项目：复制 i18n/ 与 format/ 两个目录，把它们的上级目录加入头文件搜索路径，
-// 并把 I18n.cpp 加进构建（要 JSON 表再带上 nlohmann/json 的 include 目录）。
-// 该模块与 log/ 互不依赖，可单独使用。
+// 并把 I18n.cpp 加进构建。该模块与 log/ 互不依赖，可单独使用。
 
 #include <cstddef>
 #include <initializer_list>
@@ -51,8 +47,9 @@ public:
 
     // --- 语言表 -------------------------------------------------------------
     bool LoadFile(std::string_view locale, std::string_view path);
-    // 扫描目录下所有后缀匹配的文件，文件名（去掉后缀）即语言名；返回加载数量
-    std::size_t LoadDirectory(std::string_view directory, std::string_view extension = ".lang");
+    // 扫描目录下后缀匹配的文件，文件名（去掉后缀）即语言名；返回加载数量
+    // extension 可传逗号分隔的多个后缀（如 ".lang,.json"），传空字符串表示不过滤
+    std::size_t LoadDirectory(std::string_view directory, std::string_view extension = ".lang,.json");
 
     void Register(std::string_view locale, std::initializer_list<Entry> entries);
     void Set(std::string_view locale, std::string_view key, std::string_view value);
@@ -82,9 +79,6 @@ public:
     void ClearMissingKeys();
 
     void Clear();
-
-    // 本次编译是否启用了 JSON 语言表（取决于 nlohmann/json 是否可包含）
-    static bool JsonAvailable();
 
     static Translator& Default();
 

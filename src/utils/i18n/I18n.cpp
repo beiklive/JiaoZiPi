@@ -3,19 +3,8 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
-#include <map>
 #include <string>
-
-#if defined(__has_include)
-#if __has_include(<nlohmann/json.hpp>)
-#include <nlohmann/json.hpp>
-#define JZP_I18N_HAVE_JSON 1
-#endif
-#endif
-
-#ifndef JZP_I18N_HAVE_JSON
-#define JZP_I18N_HAVE_JSON 0
-#endif
+#include <vector>
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -26,6 +15,9 @@
 namespace i18n {
 namespace {
 
+// ---------------------------------------------------------------------------
+// 文件与字符串工具
+// ---------------------------------------------------------------------------
 bool ReadFile(const std::string& path, std::string& out) {
     std::FILE* file = std::fopen(path.c_str(), "rb");
     if (file == nullptr) {
@@ -52,23 +44,11 @@ std::string_view Trim(std::string_view text) {
     return text.substr(begin, end - begin);
 }
 
-std::string Unescape(std::string_view value) {
-    std::string out;
-    out.reserve(value.size());
-    for (std::size_t i = 0; i < value.size(); ++i) {
-        if (value[i] != '\\' || i + 1 >= value.size()) {
-            out.push_back(value[i]);
-            continue;
-        }
-        switch (value[++i]) {
-            case 'n': out.push_back('\n'); break;
-            case 't': out.push_back('\t'); break;
-            case 'r': out.push_back('\r'); break;
-            case '\\': out.push_back('\\'); break;
-            default: out.push_back('\\'); out.push_back(value[i]); break;
-        }
+void WithoutBom(std::string& content) {
+    if (content.size() >= 3 && static_cast<unsigned char>(content[0]) == 0xEF &&
+        static_cast<unsigned char>(content[1]) == 0xBB && static_cast<unsigned char>(content[2]) == 0xBF) {
+        content.erase(0, 3);
     }
-    return out;
 }
 
 std::string JoinPath(std::string_view directory, std::string_view name) {
@@ -81,58 +61,195 @@ std::string JoinPath(std::string_view directory, std::string_view name) {
 }
 
 bool HasExtension(std::string_view name, std::string_view extension) {
-    if (name.size() <= extension.size()) {
+    if (extension.empty() || name.size() <= extension.size()) {
         return false;
     }
     return name.compare(name.size() - extension.size(), extension.size(), extension) == 0;
 }
 
-std::string StripExtension(std::string_view name, std::string_view extension) {
-    return std::string(name.substr(0, name.size() - extension.size()));
+// 后缀参数接受逗号分隔的多个后缀，如 ".lang,.json"；为空表示不过滤
+std::vector<std::string_view> SplitExtensions(std::string_view csv) {
+    std::vector<std::string_view> out;
+    std::size_t position = 0;
+    while (position <= csv.size()) {
+        std::size_t comma = csv.find(',', position);
+        if (comma == std::string_view::npos) {
+            comma = csv.size();
+        }
+        const std::string_view part = Trim(csv.substr(position, comma - position));
+        if (!part.empty()) {
+            out.push_back(part);
+        }
+        if (comma == csv.size()) {
+            break;
+        }
+        position = comma + 1;
+    }
+    return out;
 }
 
-// JSON 语言表：嵌套对象按 `.` 展平成与文本表一致的 key
-// 例如 {"menu": {"library": "游戏库"}} → menu.library = 游戏库
-#if JZP_I18N_HAVE_JSON
-void FlattenJson(const nlohmann::json& node, const std::string& prefix,
-                 std::map<std::string, std::string>& out) {
-    for (auto it = node.begin(); it != node.end(); ++it) {
-        const std::string key = prefix.empty() ? it.key() : prefix + "." + it.key();
-        const nlohmann::json& value = it.value();
-        if (value.is_object()) {
-            FlattenJson(value, key, out);
-        } else if (value.is_string()) {
-            out[key] = value.get<std::string>();
-        } else if (value.is_primitive()) {
-            out[key] = value.dump();
-        }
-        // 数组等复杂类型不接受，保持 key 缺失以便 MissingKeys() 暴露
+// ---------------------------------------------------------------------------
+// 语言表解析（自制，行式扁平格式，兼容两种写法）
+//   key = value          （文本表，原有写法）
+//   "key": "value",      （JSON 风格写法，引号、逗号、花括号均可省略）
+// 忽略：空行、# ; // 注释行、纯结构行 { } [ ] ,
+// 支持转义：\n \t \r \b \f \" \/ \\ 以及 \uXXXX（BMP）
+// 不支持：嵌套对象（请用点分 key 表达层级）、数组
+// ---------------------------------------------------------------------------
+void AppendUtf8(std::string& out, unsigned int code) {
+    if (code < 0x80) {
+        out.push_back(static_cast<char>(code));
+    } else if (code < 0x800) {
+        out.push_back(static_cast<char>(0xC0 | (code >> 6)));
+        out.push_back(static_cast<char>(0x80 | (code & 0x3F)));
+    } else {
+        out.push_back(static_cast<char>(0xE0 | (code >> 12)));
+        out.push_back(static_cast<char>(0x80 | ((code >> 6) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | (code & 0x3F)));
     }
 }
-#endif
 
-bool ParseJsonTable(std::string_view content, std::map<std::string, std::string>& out) {
-#if JZP_I18N_HAVE_JSON
-    const nlohmann::json doc =
-        nlohmann::json::parse(content.begin(), content.end(), nullptr, false, true);
-    if (doc.is_discarded() || !doc.is_object()) {
+unsigned int HexValue(char c) {
+    if (c >= '0' && c <= '9') {
+        return static_cast<unsigned int>(c - '0');
+    }
+    if (c >= 'a' && c <= 'f') {
+        return static_cast<unsigned int>(c - 'a' + 10);
+    }
+    return static_cast<unsigned int>(c - 'A' + 10);
+}
+
+std::string Unescape(std::string_view raw) {
+    std::string out;
+    out.reserve(raw.size());
+    for (std::size_t i = 0; i < raw.size(); ++i) {
+        if (raw[i] != '\\' || i + 1 >= raw.size()) {
+            out.push_back(raw[i]);
+            continue;
+        }
+        const char esc = raw[++i];
+        switch (esc) {
+            case 'n': out.push_back('\n'); break;
+            case 't': out.push_back('\t'); break;
+            case 'r': out.push_back('\r'); break;
+            case 'b': out.push_back('\b'); break;
+            case 'f': out.push_back('\f'); break;
+            case '"': out.push_back('"'); break;
+            case '/': out.push_back('/'); break;
+            case '\\': out.push_back('\\'); break;
+            case 'u': {
+                unsigned int code = 0;
+                int digits = 0;
+                while (digits < 4 && i + 1 < raw.size() &&
+                       std::isxdigit(static_cast<unsigned char>(raw[i + 1])) != 0) {
+                    code = code * 16 + HexValue(raw[++i]);
+                    ++digits;
+                }
+                if (digits == 4) {
+                    AppendUtf8(out, code);
+                } else {
+                    out += "\\u";
+                }
+                break;
+            }
+            default:
+                out.push_back('\\');
+                out.push_back(esc);
+                break;
+        }
+    }
+    return out;
+}
+
+// 读取带引号的片段：pos 指向开引号，返回是否闭合，结束时 pos 指向闭引号之后
+bool ReadQuoted(std::string_view line, std::size_t& pos, std::string& out) {
+    ++pos;  // 跳过开引号
+    std::string raw;
+    while (pos < line.size()) {
+        const char ch = line[pos];
+        if (ch == '\\' && pos + 1 < line.size()) {
+            raw.push_back(ch);
+            raw.push_back(line[pos + 1]);
+            pos += 2;
+            continue;
+        }
+        if (ch == '"') {
+            ++pos;
+            out = Unescape(raw);
+            return true;
+        }
+        raw.push_back(ch);
+        ++pos;
+    }
+    return false;
+}
+
+bool ParseEntry(std::string_view line, std::string& key, std::string& value) {
+    key.clear();
+    value.clear();
+
+    line = Trim(line);
+    if (line.empty()) {
         return false;
     }
-    FlattenJson(doc, std::string(), out);
-    return true;
-#else
-    (void)content;
-    (void)out;
-    return false;  // 未引入 nlohmann/json 时只支持文本表
-#endif
-}
-
-std::string_view WithoutBom(std::string& content) {
-    if (content.size() >= 3 && static_cast<unsigned char>(content[0]) == 0xEF &&
-        static_cast<unsigned char>(content[1]) == 0xBB && static_cast<unsigned char>(content[2]) == 0xBF) {
-        content.erase(0, 3);
+    if (line.front() == '#' || line.front() == ';') {
+        return false;
     }
-    return std::string_view(content);
+    if (line.size() >= 2 && line[0] == '/' && line[1] == '/') {
+        return false;
+    }
+    if (line.find_first_not_of("{}[],") == std::string_view::npos) {
+        return false;  // 纯结构行
+    }
+
+    std::size_t pos = 0;
+    if (line.front() == '"') {
+        if (!ReadQuoted(line, pos, key)) {
+            return false;
+        }
+    } else {
+        const std::size_t separator = line.find_first_of("=:");
+        if (separator == std::string_view::npos || separator == 0) {
+            return false;
+        }
+        key = std::string(Trim(line.substr(0, separator)));
+        pos = separator;
+    }
+
+    while (pos < line.size() && std::isspace(static_cast<unsigned char>(line[pos])) != 0) {
+        ++pos;
+    }
+    if (pos >= line.size() || (line[pos] != '=' && line[pos] != ':')) {
+        return false;
+    }
+    ++pos;
+    while (pos < line.size() && std::isspace(static_cast<unsigned char>(line[pos])) != 0) {
+        ++pos;
+    }
+    if (pos >= line.size()) {
+        return false;  // 空值
+    }
+
+    if (line[pos] == '"') {
+        if (!ReadQuoted(line, pos, value)) {
+            return false;
+        }
+    } else {
+        std::string_view rest = Trim(line.substr(pos));
+        if (!rest.empty() && (rest.front() == '{' || rest.front() == '[')) {
+            return false;  // 嵌套结构不支持
+        }
+        if (!rest.empty() && rest.back() == ',') {
+            rest.remove_suffix(1);
+            rest = Trim(rest);
+        }
+        if (rest.empty()) {
+            return false;
+        }
+        value = std::string(rest);
+    }
+
+    return !key.empty();
 }
 
 }  // namespace
@@ -174,22 +291,7 @@ bool Translator::LoadFile(std::string_view locale, std::string_view path) {
     if (!ReadFile(std::string(path), content)) {
         return false;
     }
-    const std::string_view text = WithoutBom(content);
-
-    // 自动识别格式：第一个非空字符是 '{' 时按 JSON 解析，否则按 key = value 文本解析
-    const std::string_view head = Trim(text);
-    if (!head.empty() && head.front() == '{') {
-        std::map<std::string, std::string> entries;
-        if (!ParseJsonTable(head, entries)) {
-            return false;
-        }
-        std::lock_guard<std::mutex> lock(mutex_);
-        auto& target = table_[std::string(locale)];
-        for (auto& entry : entries) {
-            target[entry.first] = std::move(entry.second);
-        }
-        return true;
-    }
+    WithoutBom(content);
 
     std::lock_guard<std::mutex> lock(mutex_);
     auto& target = table_[std::string(locale)];
@@ -204,20 +306,11 @@ bool Translator::LoadFile(std::string_view locale, std::string_view path) {
         if (!line.empty() && line.back() == '\r') {
             line.remove_suffix(1);
         }
-        line = Trim(line);
-        if (line.empty() || line.front() == '#' || line.front() == ';') {
-            continue;
+        std::string key;
+        std::string value;
+        if (ParseEntry(line, key, value)) {
+            target[key] = std::move(value);
         }
-        const std::size_t equals = line.find('=');
-        if (equals == std::string_view::npos) {
-            continue;
-        }
-        const std::string_view key = Trim(line.substr(0, equals));
-        if (key.empty()) {
-            continue;
-        }
-        target[std::string(key)] = Unescape(Trim(line.substr(equals + 1)));
-
         if (newline == std::string::npos) {
             break;
         }
@@ -227,6 +320,7 @@ bool Translator::LoadFile(std::string_view locale, std::string_view path) {
 
 std::size_t Translator::LoadDirectory(std::string_view directory, std::string_view extension) {
     const std::string dir(directory);
+    const std::vector<std::string_view> extensions = SplitExtensions(extension);
     std::size_t loaded = 0;
 
 #if defined(_WIN32)
@@ -240,10 +334,17 @@ std::size_t Translator::LoadDirectory(std::string_view directory, std::string_vi
             continue;
         }
         const std::string_view name(data.cFileName);
-        if (!HasExtension(name, extension)) {
+        std::string_view matched;
+        for (const std::string_view candidate : extensions) {
+            if (HasExtension(name, candidate)) {
+                matched = candidate;
+                break;
+            }
+        }
+        if (!extensions.empty() && matched.empty()) {
             continue;
         }
-        if (LoadFile(StripExtension(name, extension), JoinPath(dir, name))) {
+        if (LoadFile(name.substr(0, name.size() - matched.size()), JoinPath(dir, name))) {
             ++loaded;
         }
     } while (FindNextFileA(handle, &data) != 0);
@@ -255,10 +356,20 @@ std::size_t Translator::LoadDirectory(std::string_view directory, std::string_vi
     }
     while (dirent* entry = readdir(handle)) {
         const std::string_view name(entry->d_name);
-        if (!HasExtension(name, extension)) {
+        if (name.empty() || name.front() == '.') {
+            continue;  // 跳过 . / .. / 隐藏文件
+        }
+        std::string_view matched;
+        for (const std::string_view candidate : extensions) {
+            if (HasExtension(name, candidate)) {
+                matched = candidate;
+                break;
+            }
+        }
+        if (!extensions.empty() && matched.empty()) {
             continue;
         }
-        if (LoadFile(StripExtension(name, extension), JoinPath(dir, name))) {
+        if (LoadFile(name.substr(0, name.size() - matched.size()), JoinPath(dir, name))) {
             ++loaded;
         }
     }
@@ -375,8 +486,6 @@ Translator& Translator::Default() {
     static Translator instance;
     return instance;
 }
-
-bool Translator::JsonAvailable() { return JZP_I18N_HAVE_JSON != 0; }
 
 bool SetLocale(std::string_view locale) { return Translator::Default().SetLocale(locale); }
 

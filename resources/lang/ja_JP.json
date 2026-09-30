@@ -1,17 +1,16 @@
 {
-  "app": {
-    "name": "餃子の皮",
-    "tagline": "マルチコア・エミュレータフロントエンド"
-  },
-  "menu": {
-    "library": "ライブラリ",
-    "settings": "設定",
-    "cores": "コア管理",
-    "quit": "終了"
-  },
-  "status": {
-    "fast_forward": "早送り",
-    "rewind": "巻き戻し"
-  },
+  // JiaoZiPi 日本語テーブル（JSON 风格写法，扁平 key：一行一条）
+  // 引号与末尾逗号都可省略，解析器不处理嵌套对象
+  "app.name": "餃子の皮",
+  "app.tagline": "マルチコア・エミュレータフロントエンド",
+
+  "menu.library": "ライブラリ",
+  "menu.settings": "設定",
+  "menu.cores": "コア管理",
+  "menu.quit": "終了",
+
+  "status.fast_forward": "早送り",
+  "status.rewind": "巻き戻し",
+
   "greeting": "こんにちは、{}"
 }

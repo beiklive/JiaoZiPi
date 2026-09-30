@@ -5,7 +5,7 @@
 | [utils_smoke.cpp](utils_smoke.cpp) | `src/utils/` 日志与多语言模块冒烟测试 |
 
 ```bash
-git submodule update --init --recursive   # 首次：拉取 spdlog / nlohmann-json
+git submodule update --init --recursive   # 首次：拉取 spdlog
 sh tools/build_utils_test.sh              # 构建并运行，需在仓库根目录
 ```
 
@@ -13,7 +13,7 @@ sh tools/build_utils_test.sh              # 构建并运行，需在仓库根目
 
 ```bash
 c++ -std=c++17 -Wall -Wextra -O1 \
-    -I src/utils -I third_party/spdlog/include -I third_party/json/include \
+    -I src/utils -I third_party/spdlog/include \
     src/utils/log/Logger.cpp src/utils/i18n/I18n.cpp tests/utils_smoke.cpp -o tests/utils_smoke
 ./tests/utils_smoke
 ```

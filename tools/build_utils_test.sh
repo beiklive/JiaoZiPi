@@ -10,7 +10,6 @@ CXX="${CXX:-c++}"
 "$CXX" -std=c++17 -Wall -Wextra -O1 \
     -I src/utils \
     -I third_party/spdlog/include \
-    -I third_party/json/include \
     src/utils/log/Logger.cpp \
     src/utils/i18n/I18n.cpp \
     tests/utils_smoke.cpp \
