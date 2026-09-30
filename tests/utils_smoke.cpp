@@ -65,85 +65,46 @@ void TestI18n() {
     std::printf("[i18n]\n");
     i18n::Translator& tr = i18n::Translator::Default();
     tr.Clear();
-    tr.SetFallbackLocale("en_US");
+    tr.SetFallbackLocale("en");
 
-    const std::size_t textLoaded = tr.LoadDirectory("resources/lang", ".lang");
-    Check(textLoaded == 2, "加载 resources/lang 下 2 个文本语言表");
+    Check(tr.LoadFile("resources/lang/language.json"), "加载单个 language.json");
+    const std::vector<std::string> locales = tr.Locales();
+    Check(locales.size() == 3 && locales[0] == "en" && locales[1] == "ja" && locales[2] == "zh",
+          "语言代号取自 JSON：en / ja / zh");
 
-    const std::size_t jsonLoaded = tr.LoadDirectory("resources/lang", ".json");
-    Check(jsonLoaded == 1, "加载 1 个 JSON 风格语言表 ja_JP.json");
-    Check(tr.Locales().size() == 3, "语言列表包含 3 种语言");
-
-    Check(tr.SetLocale("ja_JP"), "切换到 ja_JP（JSON 风格表）");
-    Check(tr.Tr("menu.library") == "ライブラリ", "JSON 风格表取值正确");
-    Check(tr.Tr("greeting", "プレイヤー") == "こんにちは、プレイヤー", "JSON 风格表里的占位符同样生效");
-
-    Check(tr.SetLocale("zh_CN"), "切换到 zh_CN");
+    Check(tr.SetLocale("zh"), "切换到 zh");
     Check(tr.Tr("app.name") == "饺子皮", "中文取值正确");
     Check(tr.Tr("greeting", "玩家") == "你好，玩家", "占位符格式化");
-    Check(tr.Tr("library.count", 12) == "共 12 个游戏", "多参数/整数格式化");
-    Check(tr.Tr("app.build") == "development build", "本语言缺失时回退到 fallback 语言");
+    Check(tr.Tr("library.count", 12) == "共 12 个游戏", "整数参数格式化");
 
-    Check(tr.SetLocale("zh_TW"), "切换到 zh_TW（未加载）");
-    Check(tr.Tr("menu.library") == "游戏库", "语言前缀回退 zh_TW → zh_CN");
+    Check(tr.SetLocale("ja"), "切换到 ja");
+    Check(tr.Tr("menu.library") == "ライブラリ" && tr.Tr("menu.quit") == "終了", "日文取值正确");
+    Check(tr.Tr("app.build") == "development build", "该语言缺失的 key 回退到 fallback(en)");
 
-    Check(!tr.SetLocale("ko_KR"), "切换到未支持语言返回 false");
-    Check(tr.Tr("menu.settings") == "Settings", "未支持语言回退到 en_US");
+    Check(tr.SetLocale("zh_TW"), "切换到 zh_TW（表中只有 zh）");
+    Check(tr.Tr("menu.settings") == "设置", "语言前缀回退 zh_TW → zh");
+
+    Check(!tr.SetLocale("ko"), "切换到未支持语言返回 false");
+    Check(tr.Tr("menu.quit") == "Quit", "未支持语言回退到 en");
 
     tr.ClearMissingKeys();
-    const std::string missing = tr.Tr("no.such.key");
-    Check(missing == "no.such.key", "缺失 key 返回 key 本身");
-    const std::vector<std::string> keys = tr.MissingKeys();
-    Check(keys.size() == 1 && keys.front() == "no.such.key", "记录缺失 key");
+    Check(tr.Tr("no.such.key") == "no.such.key", "缺失 key 返回 key 本身");
+    const std::vector<std::string> missing = tr.MissingKeys();
+    Check(missing.size() == 1 && missing.front() == "no.such.key", "记录缺失 key");
 
-    tr.Set("fr_FR", "app.name", "JiaoZiPi FR");
-    tr.SetLocale("fr_FR");
-    Check(tr.Tr("app.name") == "JiaoZiPi FR", "运行时注册的语言可直接切换");
+    Check(tr.LoadString(R"({"t.num":{"en":42},"t.obj":{"en":{"nested":"x"}},"t.flat":"文本"})"),
+          "LoadString 解析内存语言表");
+    Check(tr.Tr("t.num") == "42", "非字符串值转成文本");
+    Check(!tr.Has("t.obj") && !tr.Has("t.flat"), "结构不符的条目（值不是语言映射）被忽略");
+    Check(!tr.LoadString("{ 这不是 JSON"), "非法 JSON 返回 false");
+    Check(!tr.LastError().empty(), "LastError 记录失败原因");
 
-    i18n::Translator::Default().SetLocale("zh_CN");
+    tr.Set("fr", "app.name", "JiaoZiPi FR");
+    Check(tr.SetLocale("fr") && tr.Tr("app.name") == "JiaoZiPi FR", "运行时注册的语言可直接切换");
+
+    tr.SetLocale("zh");
     Check(i18n::Tr("app.tagline") == "多核心模拟器前端", "全局便捷接口 i18n::Tr");
     Check(i18n::Tr("menu.cores") == "核心管理", "全局便捷接口：无参数");
-}
-
-// 自制语言表解析器的边界用例
-void TestParser() {
-    std::printf("[i18n 解析器]\n");
-    MAKE_DIR("tests/tmp_utils_test");
-    const std::string path = "tests/tmp_utils_test/parser.json";
-
-    const std::string content = R"JSON(// 行注释
-# 另一种注释
-{
-  "t.quoted": "带,逗号和 # 号的值",
-  "t.escape": "第一行\n第二行",
-  "t.raw" : 无引号值 ,
-  t.equal = 等号也算 ,
-  "t.unicode": "\u4E2D\u6587",
-  "t.nested": {
-  "t.orphan": "嵌套子键会落到顶层"
-}
-)JSON";
-
-    std::FILE* file = std::fopen(path.c_str(), "wb");
-    if (file == nullptr) {
-        Check(false, "写入临时语言表");
-        return;
-    }
-    std::fwrite(content.data(), 1, content.size(), file);
-    std::fclose(file);
-
-    i18n::Translator tr;
-    tr.SetFallbackLocale("zz_ZZ");
-    Check(tr.LoadFile("zz_ZZ", path), "加载混合写法的语言表");
-    Check(tr.Tr("t.quoted") == "带,逗号和 # 号的值", "引号值里的逗号与 # 不被截断");
-    Check(tr.Tr("t.escape") == "第一行\n第二行", "转义 \\n 生效");
-    Check(tr.Tr("t.raw") == "无引号值", "无引号值 + 末尾逗号可解析");
-    Check(tr.Tr("t.equal") == "等号也算", "= 写法同样可解析");
-    Check(tr.Tr("t.unicode") == "中文", "\\uXXXX 转成 UTF-8");
-    Check(!tr.Has("t.nested"), "嵌套对象那一行被忽略");
-    Check(tr.Has("t.orphan"), "嵌套子键会落到顶层（层级请改用点分 key）");
-
-    std::remove(path.c_str());
 }
 
 void TestLogger() {
@@ -251,7 +212,6 @@ void TestLogger() {
 
 int main() {
     TestI18n();
-    TestParser();
     TestLogger();
     std::printf("\n%s（失败 %d 项）\n", g_failures == 0 ? "ALL PASS" : "FAILED", g_failures);
     return g_failures == 0 ? 0 : 1;

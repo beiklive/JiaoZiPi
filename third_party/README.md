@@ -5,6 +5,7 @@
 | 路径 | 上游 | 版本 | 许可证 | 用途 |
 | --- | --- | --- | --- | --- |
 | [spdlog/](spdlog/) | https://github.com/gabime/spdlog | v1.17.0 | MIT | 日志系统的文件 IO、轮转、控制台着色（header-only 使用） |
+| [json/](json/) | https://github.com/nlohmann/json | v3.12.0 | MIT | 多语言系统读取单个 `language.json`（header-only 使用） |
 
 首次克隆后拉取：
 
@@ -12,9 +13,7 @@
 git submodule update --init --recursive
 ```
 
-header-only 使用：把 `spdlog/include` 加入头文件搜索路径即可，不需要编译第三方源码、也不影响链接。
-
-多语言模块不依赖任何第三方库：语言表的 JSON 风格写法由 `src/utils/i18n/I18n.cpp` 里的自制行式解析器处理。
+两者都是 header-only 使用：把对应 `include/` 加入头文件搜索路径即可，不需要编译第三方源码、也不影响链接。
 
 ## 模拟器核心
 

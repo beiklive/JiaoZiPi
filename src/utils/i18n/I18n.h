@@ -2,20 +2,20 @@
 
 // 通用多语言系统（独立模块，不依赖宿主项目）
 //
-// - 语言表来自 UTF-8 文件，两种写法都能读（自制解析器，无第三方依赖）：
-//     · 文本表：  app.name = 饺子皮
-//     · JSON 风格："app.name": "饺子皮",
-//   两种写法可混用；引号、逗号、花括号可省略，注释支持 # ; //
-// - 也可运行时注册（把翻译编进二进制）
-// - 查找链：当前语言 → 当前语言的语言前缀（zh_CN → zh）→ 回退语言 → key 本身
-// - 支持 `{}` 占位符格式化，支持缺失 key 统计，便于查漏
-// - 线程安全；C++17；仅依赖同仓库的 format/StrFormat.h（header-only）
+// - 语言表集中维护在单个 `language.json` 里，结构为 key → { 语言代号: 文本 }：
+//     {
+//       "app.name":  { "en": "JiaoZiPi", "zh": "饺子皮" },
+//       "menu.quit": { "en": "Quit",     "zh": "退出" }
+//     }
+//   一个文件管所有语言，不按语言拆文件
+// - 查找链：当前语言 → 同语言族（zh_TW → zh）→ 回退语言 → key 本身
+// - 支持 `{}` 占位符格式化；缺失 key 会记录，便于查漏
+// - 也可运行时注册 / 单条设置（把翻译编进二进制）
+// - 线程安全；C++17
+// - 依赖：format/StrFormat.h 与 third_party/nlohmann/json（都是 header-only）
 //
-// 解析器限制：行式、扁平 key，不支持嵌套对象与数组（层级用点分 key 表达，
-// 如 menu.library）；转义支持 \n \t \r \b \f \" \/ \\ 与 \uXXXX（BMP）。
-//
-// 迁移到其他项目：复制 i18n/ 与 format/ 两个目录，把它们的上级目录加入头文件搜索路径，
-// 并把 I18n.cpp 加进构建。该模块与 log/ 互不依赖，可单独使用。
+// 迁移到其他项目：复制 i18n/ 与 format/ 两个目录，把它们的上级目录与 nlohmann/json 的
+// include 目录加入头文件搜索路径，并把 I18n.cpp 加进构建。该模块与 log/ 互不依赖。
 
 #include <cstddef>
 #include <initializer_list>
@@ -38,7 +38,7 @@ struct Entry {
 class Translator {
 public:
     struct Options {
-        std::string fallbackLocale = "en_US";
+        std::string fallbackLocale = "en";
         bool returnKeyWhenMissing = true;  // 缺失时返回 key 本身，便于定位
     };
 
@@ -46,23 +46,23 @@ public:
     explicit Translator(Options options);
 
     // --- 语言表 -------------------------------------------------------------
-    bool LoadFile(std::string_view locale, std::string_view path);
-    // 扫描目录下后缀匹配的文件，文件名（去掉后缀）即语言名；返回加载数量
-    // extension 可传逗号分隔的多个后缀（如 ".lang,.json"），传空字符串表示不过滤
-    std::size_t LoadDirectory(std::string_view directory, std::string_view extension = ".lang,.json");
+    // 读取 language.json（key → { 语言代号: 文本 }）；失败返回 false，原因见 LastError()
+    bool LoadFile(std::string_view path);
+    // 从内存里的 JSON 文本加载，便于内置语言表与测试
+    bool LoadString(std::string_view json, std::string_view source = "<memory>");
 
     void Register(std::string_view locale, std::initializer_list<Entry> entries);
     void Set(std::string_view locale, std::string_view key, std::string_view value);
 
     // --- 语言选择 -----------------------------------------------------------
-    // 切到指定语言；返回 false 表示没有该语言的翻译，此时仍会切换（内容走回退链）
+    // 切到指定语言；返回 false 表示该语言没有任何条目（仍会切换，内容走回退链）
     bool SetLocale(std::string_view locale);
     std::string Locale() const;
 
     void SetFallbackLocale(std::string_view locale);
     std::string FallbackLocale() const;
 
-    // 已加载/注册的语言列表（字典序）
+    // 语言表中出现过的所有语言代号（字典序）
     std::vector<std::string> Locales() const;
 
     // --- 查询 ---------------------------------------------------------------
@@ -79,6 +79,7 @@ public:
     void ClearMissingKeys();
 
     void Clear();
+    std::string LastError() const;
 
     static Translator& Default();
 
@@ -89,8 +90,9 @@ private:
     mutable std::mutex mutex_;
     Options options_;
     std::string locale_;
-    std::map<std::string, std::map<std::string, std::string>> table_;
+    std::map<std::string, std::map<std::string, std::string>> table_;  // 语言 → key → 文本
     mutable std::set<std::string> missing_;
+    std::string lastError_;
 };
 
 // 便捷接口：使用 Default()

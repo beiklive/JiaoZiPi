@@ -68,13 +68,14 @@ JiaoZiPi/
 │   ├── icons/              # 图标
 │   ├── images/             # 图片
 │   ├── sounds/             # 音效
-│   ├── lang/               # 语言表（.lang 文本 / .json）
+│   ├── lang/               # 语言表（单个 language.json）
 │   ├── shaders/            # 滤镜
 │   ├── overlays/           # 遮罩
 │   ├── cheats/             # 金手指
 │   └── themes/             # 主题
 ├── third_party/            # 第三方库（子模块）与模拟器核心
-│   └── spdlog/             # 日志底层（v1.17.0，header-only 使用）
+│   ├── spdlog/             # 日志底层（v1.17.0，header-only 使用）
+│   └── json/               # 语言表解析 nlohmann/json（v3.12.0，header-only 使用）
 ├── docs/                   # 文档
 ├── tools/                  # 辅助脚本与工具
 ├── tests/                  # 测试
@@ -94,9 +95,9 @@ JiaoZiPi/
 `src/utils/` 下的 `log/` 与 `i18n/` 是不依赖本项目任何代码的独立模块，可整目录复制到其他工程：
 
 - 日志：等级过滤、控制台 / 文件（实时写入、按大小轮转）/ 回调输出端，底层用 spdlog，用法见 [log/README.md](src/utils/log/README.md)
-- 多语言：文本与 JSON 风格语言表（自制行式解析器，零第三方依赖）+ 运行时注册，查找链「当前语言 → 同语言族 → 回退语言 → key」，用法见 [i18n/README.md](src/utils/i18n/README.md)
+- 多语言：单个 [language.json](resources/lang/language.json) 管所有语言（`key → { 语言: 文本 }`），查找链「当前语言 → 同语言族 → 回退语言 → key」，用法见 [i18n/README.md](src/utils/i18n/README.md)
 
-日志底层是 header-only 依赖，首次克隆后先拉取子模块：
+两者对第三方库只做 header-only 依赖（spdlog / nlohmann-json），首次克隆后先拉取子模块：
 
 ```bash
 git submodule update --init --recursive

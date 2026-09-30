@@ -1,0 +1,53 @@
+{
+  // JiaoZiPi 语言表：一个文件管所有语言
+  // 结构：key → { 语言代号: 文本 }，key 用点分扁平写法
+  // 语言代号可自行增删（en / zh / ja ...），缺某语言时回退到 fallback（默认 en）
+
+  "app.name": {
+    "en": "JiaoZiPi",
+    "zh": "饺子皮",
+    "ja": "餃子の皮"
+  },
+  "app.tagline": {
+    "en": "Multi-core emulator frontend",
+    "zh": "多核心模拟器前端",
+    "ja": "マルチコア・エミュレータフロントエンド"
+  },
+  // 只有 en 的条目：其它语言会自动回退到 en
+  "app.build": {
+    "en": "development build"
+  },
+
+  "menu.library": { "en": "Library", "zh": "游戏库", "ja": "ライブラリ" },
+  "menu.settings": { "en": "Settings", "zh": "设置", "ja": "設定" },
+  "menu.cores": { "en": "Cores", "zh": "核心管理", "ja": "コア管理" },
+  "menu.about": { "en": "About", "zh": "关于", "ja": "情報" },
+  "menu.quit": { "en": "Quit", "zh": "退出", "ja": "終了" },
+
+  "library.empty": {
+    "en": "No games yet, scan a folder first",
+    "zh": "还没有游戏，先扫描一下目录吧",
+    "ja": "ゲームがありません。まずフォルダをスキャンしてください"
+  },
+  "library.scanning": { "en": "Scanning: {}", "zh": "正在扫描：{}", "ja": "スキャン中：{}" },
+  "library.count": { "en": "{} games", "zh": "共 {} 个游戏", "ja": "{} 個のゲーム" },
+
+  "settings.language": { "en": "Language", "zh": "语言", "ja": "言語" },
+  "settings.theme": { "en": "Theme", "zh": "主题", "ja": "テーマ" },
+  "settings.log_level": { "en": "Log level", "zh": "日志等级", "ja": "ログレベル" },
+
+  "core.missing": { "en": "Missing {} core", "zh": "缺少 {} 核心", "ja": "{} コアがありません" },
+  "core.load_failed": {
+    "en": "Failed to load core: {}",
+    "zh": "核心加载失败：{}",
+    "ja": "コアの読み込みに失敗：{}"
+  },
+
+  "status.fast_forward": { "en": "Fast forward", "zh": "快进", "ja": "早送り" },
+  "status.rewind": { "en": "Rewind", "zh": "倒带", "ja": "巻き戻し" },
+  "status.cheat": { "en": "Cheats", "zh": "金手指", "ja": "チート" },
+  "status.overlay": { "en": "Overlay", "zh": "遮罩", "ja": "オーバーレイ" },
+  "status.shader": { "en": "Shader", "zh": "滤镜", "ja": "シェーダー" },
+
+  "greeting": { "en": "Hello, {}", "zh": "你好，{}", "ja": "こんにちは、{}" }
+}
