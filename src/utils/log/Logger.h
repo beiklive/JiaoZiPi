@@ -4,15 +4,16 @@
 //
 // - 等级过滤：Trace / Debug / Info / Warn / Error / Fatal / Off
 // - 输出端：控制台（可着色）、文件（实时 flush、可选按大小轮转）、回调（游戏内覆盖层等）
-// - 线程安全；C++17；仅依赖同仓库的 format/StrFormat.h（header-only）
+// - 线程安全；C++17
+// - 依赖：format/StrFormat.h（header-only）与 third_party/spdlog（header-only 使用，
+//   承担文件 IO、轮转、控制台着色；本文件不暴露 spdlog 类型）
 //
-// 迁移到其他项目：复制 log/ 与 format/ 两个目录，把它们的上级目录加入头文件搜索路径
-// （例如 -Isrc/utils），并把 Logger.cpp 加进构建即可，无需任何宿主类型。
+// 迁移到其他项目：复制 log/ 与 format/ 两个目录，带上 spdlog 头文件目录，
+// 把 log/、format/ 的上级目录与 spdlog 的 include 加入头文件搜索路径，把 Logger.cpp 加进构建。
 
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
-#include <cstdio>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -21,6 +22,12 @@
 #include <vector>
 
 #include "format/StrFormat.h"
+
+namespace spdlog {
+namespace sinks {
+class sink;  // 前置声明：底层输出端实现见 Logger.cpp，本头文件不引入 spdlog
+}  // namespace sinks
+}  // namespace spdlog
 
 namespace logging {
 
@@ -53,11 +60,10 @@ public:
     virtual void Flush() {}
 };
 
-// 控制台输出：默认 <= Warn 走 stdout，>= Error 走 stderr
+// 控制台输出（spdlog stdout/stderr sink）：默认 <= Warn 走 stdout，>= Error 走 stderr
 class ConsoleSink final : public Sink {
 public:
     struct Options {
-        std::FILE* stream = nullptr;     // 指定后忽略 splitStreams
         bool splitStreams = true;
         bool color = true;
         bool flushEveryWrite = false;
@@ -72,9 +78,11 @@ public:
 private:
     Options options_;
     std::mutex mutex_;
+    std::shared_ptr<spdlog::sinks::sink> out_;
+    std::shared_ptr<spdlog::sinks::sink> err_;
 };
 
-// 文件输出：默认每次写入即 flush（实时落盘）
+// 文件输出（spdlog file sink）：默认每次写入即 flush（实时落盘）
 class FileSink final : public Sink {
 public:
     struct Options {
@@ -82,7 +90,7 @@ public:
         bool append = true;
         bool flushEveryWrite = true;  // 实时写入
         std::size_t maxBytes = 0;     // > 0 时按大小轮转
-        int maxFiles = 3;             // 轮转保留的备份数量（path.1 ... path.N）
+        int maxFiles = 3;             // 轮转备份数量：app.log → app.1.log、app.2.log ...
     };
 
     explicit FileSink(Options options);
@@ -99,13 +107,11 @@ public:
 
 private:
     void OpenLocked();
-    void RotateLocked();
-    void CloseLocked();
 
     Options options_;
     mutable std::mutex mutex_;
-    std::FILE* stream_ = nullptr;
-    std::size_t size_ = 0;
+    std::shared_ptr<spdlog::sinks::sink> sink_;
+    bool open_ = false;
 };
 
 // 回调输出：供游戏内日志窗口之类的场景直接消费结构化记录

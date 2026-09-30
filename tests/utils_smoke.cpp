@@ -1,7 +1,9 @@
-// 日志系统 + 多语言系统 冒烟测试（无第三方依赖，直接编译运行）
+// 日志系统 + 多语言系统 冒烟测试
 //
-// 构建：c++ -std=c++17 -Wall -Wextra -I src/utils \
-//          src/utils/log/Logger.cpp src/utils/i18n/I18n.cpp tests/utils_smoke.cpp -o tests/utils_smoke
+// 构建（可直接用 tools/build_utils_test.sh）：
+//   c++ -std=c++17 -Wall -Wextra -I src/utils \
+//       -I third_party/spdlog/include -I third_party/json/include \
+//       src/utils/log/Logger.cpp src/utils/i18n/I18n.cpp tests/utils_smoke.cpp -o tests/utils_smoke
 // 运行：在仓库根目录执行 ./tests/utils_smoke（语言文件按 resources/lang 相对路径加载）
 
 #include <cstdio>
@@ -66,9 +68,23 @@ void TestI18n() {
     tr.Clear();
     tr.SetFallbackLocale("en_US");
 
-    const std::size_t loaded = tr.LoadDirectory("resources/lang");
-    Check(loaded == 2, "加载 resources/lang 下 2 个语言文件");
-    Check(tr.Locales().size() == 2, "语言列表包含 2 种语言");
+    const std::size_t textLoaded = tr.LoadDirectory("resources/lang", ".lang");
+    Check(textLoaded == 2, "加载 resources/lang 下 2 个文本语言表");
+
+    const std::size_t jsonLoaded = tr.LoadDirectory("resources/lang", ".json");
+    const bool jsonOk = i18n::Translator::JsonAvailable();
+    if (jsonOk) {
+        Check(jsonLoaded == 1, "加载 JSON 语言表 ja_JP.json");
+    } else {
+        Check(jsonLoaded == 0, "未包含 nlohmann/json，JSON 表被跳过（降级为文本表）");
+    }
+    Check(tr.Locales().size() == (jsonOk ? 3u : 2u), "语言列表数量正确");
+
+    if (jsonOk) {
+        Check(tr.SetLocale("ja_JP"), "切换到 ja_JP（JSON 表）");
+        Check(tr.Tr("menu.library") == "ライブラリ", "JSON 嵌套对象展平为点分 key");
+        Check(tr.Tr("greeting", "プレイヤー") == "こんにちは、プレイヤー", "JSON 表里的占位符同样生效");
+    }
 
     Check(tr.SetLocale("zh_CN"), "切换到 zh_CN");
     Check(tr.Tr("app.name") == "饺子皮", "中文取值正确");
@@ -79,7 +95,7 @@ void TestI18n() {
     Check(tr.SetLocale("zh_TW"), "切换到 zh_TW（未加载）");
     Check(tr.Tr("menu.library") == "游戏库", "语言前缀回退 zh_TW → zh_CN");
 
-    Check(!tr.SetLocale("ja_JP"), "切换到未支持语言返回 false");
+    Check(!tr.SetLocale("ko_KR"), "切换到未支持语言返回 false");
     Check(tr.Tr("menu.settings") == "Settings", "未支持语言回退到 en_US");
 
     tr.ClearMissingKeys();
@@ -153,11 +169,13 @@ void TestLogger() {
     logger.RemoveAllSinks();
     Check(logger.SinkCount() == 0, "移除全部输出端");
 
-    // 轮转
+    // 轮转（spdlog rotating sink 的备份命名为 rot.1.log / rot.2.log）
     const std::string rotatePath = "tests/tmp_utils_test/rot.log";
+    const std::string rotatePath1 = "tests/tmp_utils_test/rot.1.log";
+    const std::string rotatePath2 = "tests/tmp_utils_test/rot.2.log";
     std::remove(rotatePath.c_str());
-    std::remove((rotatePath + ".1").c_str());
-    std::remove((rotatePath + ".2").c_str());
+    std::remove(rotatePath1.c_str());
+    std::remove(rotatePath2.c_str());
     {
         logging::Logger rotating;
         rotating.SetLevel(logging::Level::Trace);
@@ -174,7 +192,7 @@ void TestLogger() {
         }
         rotating.Flush();
     }
-    Check(FileExists(rotatePath) && FileExists(rotatePath + ".1"), "按大小轮转生成 .1 备份");
+    Check(FileExists(rotatePath) && FileExists(rotatePath1), "按大小轮转生成 .1 备份");
 
     // 默认日志器 + 多种 pattern 占位符
     logging::Logger patterned;
@@ -191,8 +209,8 @@ void TestLogger() {
 
     std::remove(logPath.c_str());
     std::remove(rotatePath.c_str());
-    std::remove((rotatePath + ".1").c_str());
-    std::remove((rotatePath + ".2").c_str());
+    std::remove(rotatePath1.c_str());
+    std::remove(rotatePath2.c_str());
     REMOVE_DIR("tests/tmp_utils_test");
 }
 

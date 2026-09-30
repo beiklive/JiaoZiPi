@@ -2,6 +2,7 @@
 build/
 build-*/
 out/
+tests/utils_smoke
 *.o
 *.a
 *.so

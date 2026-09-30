@@ -68,12 +68,14 @@ JiaoZiPi/
 │   ├── icons/              # 图标
 │   ├── images/             # 图片
 │   ├── sounds/             # 音效
-│   ├── lang/               # 多语言文本
+│   ├── lang/               # 语言表（.lang 文本 / .json）
 │   ├── shaders/            # 滤镜
 │   ├── overlays/           # 遮罩
 │   ├── cheats/             # 金手指
 │   └── themes/             # 主题
-├── third_party/            # 第三方代码与模拟器核心
+├── third_party/            # 第三方库（子模块）与模拟器核心
+│   ├── spdlog/             # 日志底层（v1.17.0，header-only 使用）
+│   └── json/               # JSON 语言表解析（nlohmann/json v3.12.0，可选）
 ├── docs/                   # 文档
 ├── tools/                  # 辅助脚本与工具
 ├── tests/                  # 测试
@@ -92,15 +94,19 @@ JiaoZiPi/
 
 `src/utils/` 下的 `log/` 与 `i18n/` 是不依赖本项目任何代码的独立模块，可整目录复制到其他工程：
 
-- 日志：等级过滤、控制台 / 文件（实时写入、按大小轮转）/ 回调输出端，用法见 [log/README.md](src/utils/log/README.md)
-- 多语言：UTF-8 文本语言表 + 运行时注册，查找链「当前语言 → 同语言族 → 回退语言 → key」，用法见 [i18n/README.md](src/utils/i18n/README.md)
+- 日志：等级过滤、控制台 / 文件（实时写入、按大小轮转）/ 回调输出端，底层用 spdlog，用法见 [log/README.md](src/utils/log/README.md)
+- 多语言：文本与 JSON 语言表 + 运行时注册，查找链「当前语言 → 同语言族 → 回退语言 → key」，JSON 解析用 nlohmann/json（可选），用法见 [i18n/README.md](src/utils/i18n/README.md)
+
+两者对第三方库只做 header-only 依赖，首次克隆后先拉取子模块：
+
+```bash
+git submodule update --init --recursive
+```
 
 冒烟测试：
 
 ```bash
-c++ -std=c++17 -Wall -Wextra -I src/utils \
-    src/utils/log/Logger.cpp src/utils/i18n/I18n.cpp tests/utils_smoke.cpp -o tests/utils_smoke
-./tests/utils_smoke
+sh tools/build_utils_test.sh
 ```
 
 ## 开发计划

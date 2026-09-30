@@ -3,7 +3,19 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
+#include <map>
 #include <string>
+
+#if defined(__has_include)
+#if __has_include(<nlohmann/json.hpp>)
+#include <nlohmann/json.hpp>
+#define JZP_I18N_HAVE_JSON 1
+#endif
+#endif
+
+#ifndef JZP_I18N_HAVE_JSON
+#define JZP_I18N_HAVE_JSON 0
+#endif
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -79,6 +91,50 @@ std::string StripExtension(std::string_view name, std::string_view extension) {
     return std::string(name.substr(0, name.size() - extension.size()));
 }
 
+// JSON 语言表：嵌套对象按 `.` 展平成与文本表一致的 key
+// 例如 {"menu": {"library": "游戏库"}} → menu.library = 游戏库
+#if JZP_I18N_HAVE_JSON
+void FlattenJson(const nlohmann::json& node, const std::string& prefix,
+                 std::map<std::string, std::string>& out) {
+    for (auto it = node.begin(); it != node.end(); ++it) {
+        const std::string key = prefix.empty() ? it.key() : prefix + "." + it.key();
+        const nlohmann::json& value = it.value();
+        if (value.is_object()) {
+            FlattenJson(value, key, out);
+        } else if (value.is_string()) {
+            out[key] = value.get<std::string>();
+        } else if (value.is_primitive()) {
+            out[key] = value.dump();
+        }
+        // 数组等复杂类型不接受，保持 key 缺失以便 MissingKeys() 暴露
+    }
+}
+#endif
+
+bool ParseJsonTable(std::string_view content, std::map<std::string, std::string>& out) {
+#if JZP_I18N_HAVE_JSON
+    const nlohmann::json doc =
+        nlohmann::json::parse(content.begin(), content.end(), nullptr, false, true);
+    if (doc.is_discarded() || !doc.is_object()) {
+        return false;
+    }
+    FlattenJson(doc, std::string(), out);
+    return true;
+#else
+    (void)content;
+    (void)out;
+    return false;  // 未引入 nlohmann/json 时只支持文本表
+#endif
+}
+
+std::string_view WithoutBom(std::string& content) {
+    if (content.size() >= 3 && static_cast<unsigned char>(content[0]) == 0xEF &&
+        static_cast<unsigned char>(content[1]) == 0xBB && static_cast<unsigned char>(content[2]) == 0xBF) {
+        content.erase(0, 3);
+    }
+    return std::string_view(content);
+}
+
 }  // namespace
 
 Translator::Translator() : Translator(Options()) {}
@@ -118,9 +174,21 @@ bool Translator::LoadFile(std::string_view locale, std::string_view path) {
     if (!ReadFile(std::string(path), content)) {
         return false;
     }
-    if (content.size() >= 3 && static_cast<unsigned char>(content[0]) == 0xEF &&
-        static_cast<unsigned char>(content[1]) == 0xBB && static_cast<unsigned char>(content[2]) == 0xBF) {
-        content.erase(0, 3);  // 去掉 UTF-8 BOM
+    const std::string_view text = WithoutBom(content);
+
+    // 自动识别格式：第一个非空字符是 '{' 时按 JSON 解析，否则按 key = value 文本解析
+    const std::string_view head = Trim(text);
+    if (!head.empty() && head.front() == '{') {
+        std::map<std::string, std::string> entries;
+        if (!ParseJsonTable(head, entries)) {
+            return false;
+        }
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto& target = table_[std::string(locale)];
+        for (auto& entry : entries) {
+            target[entry.first] = std::move(entry.second);
+        }
+        return true;
     }
 
     std::lock_guard<std::mutex> lock(mutex_);
@@ -307,6 +375,8 @@ Translator& Translator::Default() {
     static Translator instance;
     return instance;
 }
+
+bool Translator::JsonAvailable() { return JZP_I18N_HAVE_JSON != 0; }
 
 bool SetLocale(std::string_view locale) { return Translator::Default().SetLocale(locale); }
 

@@ -1,10 +1,25 @@
+// 日志系统实现：IO、轮转、控制台着色由 spdlog 承担（third_party/spdlog），
+// 本文件只保留等级过滤、行格式与输出端门面（Sink 接口）。
+// spdlog 以 header-only 方式使用，无需额外编译 spdlog 源码。
+
+#define SPDLOG_HEADER_ONLY
+
 #include "Logger.h"
+
+#include <spdlog/details/log_msg.h>
+#include <spdlog/sinks/basic_file_sink.h>
+#include <spdlog/sinks/callback_sink.h>
+#include <spdlog/sinks/rotating_file_sink.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/sinks/stdout_sinks.h>
 
 #include <algorithm>
 #include <cctype>
 #include <chrono>
+#include <cstdio>
 #include <cstring>
 #include <ctime>
+#include <exception>
 
 namespace logging {
 namespace {
@@ -36,8 +51,8 @@ std::string BaseName(const char* path) {
 }
 
 struct TimeParts {
-    std::string date;      // YYYY-MM-DD
-    std::string time;      // HH:MM:SS.mmm
+    std::string date;  // YYYY-MM-DD
+    std::string time;  // HH:MM:SS.mmm
 };
 
 TimeParts SplitTime(std::int64_t timestampMs, bool utc) {
@@ -63,6 +78,31 @@ TimeParts SplitTime(std::int64_t timestampMs, bool utc) {
     std::snprintf(time, sizeof(time), "%02d:%02d:%02d.%03d", tm.tm_hour, tm.tm_min, tm.tm_sec,
                   static_cast<int>(timestampMs % 1000));
     return TimeParts{date, time};
+}
+
+// 把本模块等级映射到 spdlog 等级（spdlog 只用于着色与输出）
+spdlog::level::level_enum ToSpdlogLevel(Level level) {
+    switch (level) {
+        case Level::Trace: return spdlog::level::trace;
+        case Level::Debug: return spdlog::level::debug;
+        case Level::Info: return spdlog::level::info;
+        case Level::Warn: return spdlog::level::warn;
+        case Level::Error: return spdlog::level::err;
+        case Level::Fatal: return spdlog::level::critical;
+        case Level::Off:
+        default: return spdlog::level::off;
+    }
+}
+
+// 本模块已完成整行格式化，交给 spdlog 的 sink 时只用 %v（着色时加 %^ %$ 让 sink 按等级上色）
+constexpr const char* kPlainPattern = "%v";
+constexpr const char* kColorPattern = "%^%v%$";
+
+spdlog::details::log_msg MakeMessage(const Record& record, std::string_view line) {
+    return spdlog::details::log_msg{spdlog::log_clock::now(),
+                                    spdlog::source_loc{record.file, record.line, ""},
+                                    spdlog::string_view_t{"jzp", 3}, ToSpdlogLevel(record.level),
+                                    spdlog::string_view_t{line.data(), line.size()}};
 }
 
 }  // namespace
@@ -107,113 +147,107 @@ bool ParseLevel(std::string_view text, Level& out) {
 }
 
 // ---------------------------------------------------------------------------
-// ConsoleSink
+// ConsoleSink —— 底层为 spdlog 的 stdout/stderr 彩色 sink
 // ---------------------------------------------------------------------------
 ConsoleSink::ConsoleSink() : ConsoleSink(Options()) {}
 
-ConsoleSink::ConsoleSink(Options options) : options_(std::move(options)) {}
-
-void ConsoleSink::Write(const Record& record, std::string_view line) {
-    std::FILE* out = options_.stream;
-    if (out == nullptr) {
-        out = (options_.splitStreams && record.level >= Level::Error) ? stderr : stdout;
-    }
-    if (out == nullptr) {
+ConsoleSink::ConsoleSink(Options options) : options_(std::move(options)) {
+    try {
+        if (options_.color) {
+            out_ = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+            if (options_.splitStreams) {
+                err_ = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
+            }
+        } else {
+            out_ = std::make_shared<spdlog::sinks::stdout_sink_mt>();
+            if (options_.splitStreams) {
+                err_ = std::make_shared<spdlog::sinks::stderr_sink_mt>();
+            }
+        }
+    } catch (const std::exception&) {
+        out_.reset();
+        err_.reset();
         return;
     }
 
+    // 行内容已由本模块格式化，sink 只输出 %v；着色时用 %^%v%$ 让 sink 按等级上色
+    for (const auto& sink : {out_, err_}) {
+        if (sink != nullptr) {
+            sink->set_pattern(options_.color ? kColorPattern : kPlainPattern);
+            sink->set_level(spdlog::level::trace);
+        }
+    }
+}
+
+void ConsoleSink::Write(const Record& record, std::string_view line) {
+    auto* sink = (options_.splitStreams && record.level >= Level::Error && err_ != nullptr)
+                     ? err_.get()
+                     : out_.get();
+    if (sink == nullptr) {
+        return;
+    }
     std::lock_guard<std::mutex> lock(mutex_);
-    if (options_.color) {
-        std::fputs(LevelColor(record.level), out);
-    }
-    std::fwrite(line.data(), 1, line.size(), out);
-    if (options_.color) {
-        std::fputs("\x1b[0m", out);
-    }
-    std::fputc('\n', out);
-    if (options_.flushEveryWrite) {
-        std::fflush(out);
+    try {
+        sink->log(MakeMessage(record, line));
+        if (options_.flushEveryWrite) {
+            sink->flush();
+        }
+    } catch (const std::exception&) {
+        // 输出失败不影响主流程
     }
 }
 
 void ConsoleSink::Flush() {
     std::lock_guard<std::mutex> lock(mutex_);
-    std::FILE* out = options_.stream;
-    if (out == nullptr) {
-        out = stdout;
-    }
-    std::fflush(out);
-    if (options_.stream == nullptr) {
-        std::fflush(stderr);
+    for (const auto& sink : {out_, err_}) {
+        if (sink != nullptr) {
+            try {
+                sink->flush();
+            } catch (const std::exception&) {
+            }
+        }
     }
 }
 
 // ---------------------------------------------------------------------------
-// FileSink
+// FileSink —— 底层为 spdlog 的 basic_file_sink / rotating_file_sink
 // ---------------------------------------------------------------------------
 FileSink::FileSink(Options options) : options_(std::move(options)) {
     std::lock_guard<std::mutex> lock(mutex_);
     OpenLocked();
 }
 
-FileSink::~FileSink() {
-    std::lock_guard<std::mutex> lock(mutex_);
-    CloseLocked();
-}
-
-void FileSink::CloseLocked() {
-    if (stream_ != nullptr) {
-        std::fflush(stream_);
-        std::fclose(stream_);
-        stream_ = nullptr;
-    }
-}
+FileSink::~FileSink() = default;
 
 void FileSink::OpenLocked() {
-    CloseLocked();
+    sink_.reset();
+    open_ = false;
     if (options_.path.empty()) {
         return;
     }
-    stream_ = std::fopen(options_.path.c_str(), options_.append ? "ab" : "wb");
-    if (stream_ == nullptr) {
-        return;
-    }
-    size_ = 0;
-    if (options_.append) {
-        if (std::fseek(stream_, 0, SEEK_END) == 0) {
-            const long position = std::ftell(stream_);
-            size_ = position > 0 ? static_cast<std::size_t>(position) : 0;
+    try {
+        if (options_.maxBytes > 0) {
+            sink_ = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
+                options_.path, options_.maxBytes,
+                static_cast<std::size_t>(options_.maxFiles > 0 ? options_.maxFiles : 1), false);
+        } else {
+            sink_ = std::make_shared<spdlog::sinks::basic_file_sink_mt>(options_.path, !options_.append);
         }
-    }
-    if (options_.flushEveryWrite) {
-        std::fflush(stream_);
-    }
-}
-
-void FileSink::RotateLocked() {
-    CloseLocked();
-    const std::string& path = options_.path;
-    const int maxFiles = options_.maxFiles > 0 ? options_.maxFiles : 0;
-    if (maxFiles > 0) {
-        std::remove((path + "." + std::to_string(maxFiles)).c_str());
-        for (int i = maxFiles - 1; i >= 1; --i) {
-            const std::string from = path + "." + std::to_string(i);
-            const std::string to = path + "." + std::to_string(i + 1);
-            std::remove(to.c_str());
-            std::rename(from.c_str(), to.c_str());
+        sink_->set_pattern(kPlainPattern);
+        sink_->set_level(spdlog::level::trace);
+        open_ = true;
+        if (options_.flushEveryWrite) {
+            sink_->flush();
         }
-        const std::string to = path + ".1";
-        std::remove(to.c_str());
-        std::rename(path.c_str(), to.c_str());
-    } else {
-        std::remove(path.c_str());
+    } catch (const std::exception&) {
+        sink_.reset();
+        open_ = false;
     }
-    OpenLocked();
 }
 
 bool FileSink::IsOpen() const {
     std::lock_guard<std::mutex> lock(mutex_);
-    return stream_ != nullptr;
+    return open_;
 }
 
 std::string FileSink::Path() const {
@@ -230,40 +264,39 @@ void FileSink::SetMaxBytes(std::size_t bytes, int maxFiles) {
     std::lock_guard<std::mutex> lock(mutex_);
     options_.maxBytes = bytes;
     options_.maxFiles = maxFiles > 0 ? maxFiles : 1;
+    OpenLocked();  // 轮转与不轮转由不同的 spdlog sink 实现，切换时重建
 }
 
-void FileSink::Write(const Record& /*record*/, std::string_view line) {
+void FileSink::Write(const Record& record, std::string_view line) {
     std::lock_guard<std::mutex> lock(mutex_);
-    if (stream_ == nullptr) {
+    if (sink_ == nullptr) {
         OpenLocked();
-        if (stream_ == nullptr) {
+        if (sink_ == nullptr) {
             return;
         }
     }
-    const std::size_t need = line.size() + 1;
-    if (options_.maxBytes > 0 && size_ > 0 && size_ + need > options_.maxBytes) {
-        RotateLocked();
-        if (stream_ == nullptr) {
-            return;
+    try {
+        sink_->log(MakeMessage(record, line));
+        if (options_.flushEveryWrite) {
+            sink_->flush();  // 实时写入：进程崩溃也不丢日志
         }
-    }
-    std::fwrite(line.data(), 1, line.size(), stream_);
-    std::fputc('\n', stream_);
-    size_ += need;
-    if (options_.flushEveryWrite) {
-        std::fflush(stream_);  // 实时写入：进程崩溃也不丢日志
+    } catch (const std::exception&) {
+        open_ = false;
     }
 }
 
 void FileSink::Flush() {
     std::lock_guard<std::mutex> lock(mutex_);
-    if (stream_ != nullptr) {
-        std::fflush(stream_);
+    if (sink_ != nullptr) {
+        try {
+            sink_->flush();
+        } catch (const std::exception&) {
+        }
     }
 }
 
 // ---------------------------------------------------------------------------
-// CallbackSink
+// CallbackSink —— 直接回调，供游戏内日志窗口消费结构化记录
 // ---------------------------------------------------------------------------
 CallbackSink::CallbackSink(Callback callback) : callback_(std::move(callback)) {}
 
@@ -274,7 +307,7 @@ void CallbackSink::Write(const Record& record, std::string_view line) {
 }
 
 // ---------------------------------------------------------------------------
-// Logger
+// Logger：等级过滤 + 行格式 + 输出端分发
 // ---------------------------------------------------------------------------
 Logger::Logger() : Logger(Options()) {}
 

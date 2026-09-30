@@ -1,0 +1,17 @@
+{
+  "app": {
+    "name": "餃子の皮",
+    "tagline": "マルチコア・エミュレータフロントエンド"
+  },
+  "menu": {
+    "library": "ライブラリ",
+    "settings": "設定",
+    "cores": "コア管理",
+    "quit": "終了"
+  },
+  "status": {
+    "fast_forward": "早送り",
+    "rewind": "巻き戻し"
+  },
+  "greeting": "こんにちは、{}"
+}
