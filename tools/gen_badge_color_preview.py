@@ -49,10 +49,27 @@ FONT = {
     "W": ["#...#", "#...#", "#...#", "#.#.#", "#.#.#", "##.##", "#...#"],
 }
 
-CANVAS_BG = (0x1E, 0x1E, 0x1E)
-TITLE_COLOR = (0xF2, 0xF2, 0xF2)
-HEX_COLOR = (0xE0, 0xE0, 0xE0)
-KEY_COLOR = (0x8A, 0x8A, 0x8A)
+CANVAS_BG = (0xFA, 0xF7, 0xF0)   # 奶油白基础底色
+TITLE_COLOR = (0x2E, 0x2A, 0x26)
+HEX_COLOR = (0x5A, 0x54, 0x4C)
+KEY_COLOR = (0xA8, 0xA0, 0x94)
+INK = (0x2B, 0x2B, 0x2B)
+WHITE = (0xFF, 0xFF, 0xFF)
+
+
+def luminance(color):
+    """相对亮度 0~1000，与头文件 RelativeLuminance 保持一致。"""
+
+    def ch(c):
+        return c * c * 1000 // (255 * 255)
+
+    return (299 * ch(color[0]) + 587 * ch(color[1]) + 114 * ch(color[2])) // 1000
+
+
+def text_color_on(bg):
+    """与头文件 MachineBadgeTextColor 保持一致：浅色底用深色字，深色底用白字。"""
+    bg_l, ink_l, white_l = luminance(bg), luminance(INK), luminance(WHITE)
+    return INK if (bg_l + 50) / (ink_l + 50) >= (white_l + 50) / (bg_l + 50) else WHITE
 
 
 def text_width(text, scale):
@@ -78,7 +95,7 @@ def put_px(buf, w, h, x, y, color):
         buf[off:off + 3] = bytes(color)
 
 
-def fill_round_rect(buf, w, h, x, y, rw, rh, color, radius=6):
+def fill_round_rect(buf, w, h, x, y, rw, rh, color, radius=6, border=None):
     for yy in range(y, y + rh):
         for xx in range(x, x + rw):
             dx = min(xx - x, x + rw - 1 - xx)
@@ -86,7 +103,10 @@ def fill_round_rect(buf, w, h, x, y, rw, rh, color, radius=6):
             if dx < radius and dy < radius:
                 if (radius - dx) ** 2 + (radius - dy) ** 2 > radius ** 2:
                     continue
-            put_px(buf, w, h, xx, yy, color)
+            if border and (dx == 0 or dy == 0):
+                put_px(buf, w, h, xx, yy, border)
+            else:
+                put_px(buf, w, h, xx, yy, color)
 
 
 def write_png(path, w, h, buf):
@@ -137,12 +157,13 @@ def main():
 
     y = pad + 44
     for key in order:
-        r, g, b = (int(colors[key][i:i + 2], 16) for i in (0, 2, 4))
-        fill_round_rect(buf, w, h, pad, y, badge_w, badge_h, (r, g, b))
+        rgb = tuple(int(colors[key][i:i + 2], 16) for i in (0, 2, 4))
+        border = tuple(max(0, c * 3 // 4) for c in rgb)
+        fill_round_rect(buf, w, h, pad, y, badge_w, badge_h, rgb, border=border)
         label = labels[key]
         tx = pad + (badge_w - text_width(label, 2)) // 2
         ty = y + (badge_h - 7 * 2) // 2
-        draw_text(buf, w, h, tx, ty, label, (0xFF, 0xFF, 0xFF), 2)
+        draw_text(buf, w, h, tx, ty, label, text_color_on(rgb), 2)
 
         draw_text(buf, w, h, pad + badge_w + 24, y + 6, "#" + colors[key].upper(), HEX_COLOR, 2)
         draw_text(buf, w, h, pad + badge_w + 200, y + 6, key, KEY_COLOR, 2)

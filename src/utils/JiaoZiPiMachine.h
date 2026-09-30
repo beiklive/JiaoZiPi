@@ -1,6 +1,9 @@
 #pragma once
 
 // 机种（平台核心）定义与徽标配色。
+//
+// 机种主题色规范：以各机种经典硬件外观、品牌标识和玩家记忆为基础的印象色，
+// 统一降低饱和度以适配浅色 32-bit 像素风界面。仅定义主色，不使用机身原色还原。
 // 配色为单一数据源：配色预览图由 tools/gen_badge_color_preview.py 解析本文件生成，
 // 修改颜色后重新运行该脚本即可同步预览。
 
@@ -75,21 +78,21 @@ constexpr Color Rgba(uint32_t rgb, uint8_t a = 0xFF) {
 // 机种徽标底色（徽标文字统一使用白色）。
 constexpr Color MachineBadgeColor(Machine m) {
     switch (m) {
-        case Machine::FC:     return Rgba(0xE60012);
-        case Machine::SFC:    return Rgba(0x8E44AD);
-        case Machine::GB:     return Rgba(0x6C8E1F);
-        case Machine::GBC:    return Rgba(0x00897B);
-        case Machine::GBA:    return Rgba(0x3F51B5);
-        case Machine::NDS:    return Rgba(0x607D8B);
-        case Machine::N3DS:   return Rgba(0xA3121F);
-        case Machine::NGC:    return Rgba(0x4527A0);
-        case Machine::WII:    return Rgba(0x00A0E9);
-        case Machine::MD:     return Rgba(0x0060A8);
-        case Machine::SS:     return Rgba(0x455A64);
-        case Machine::DC:     return Rgba(0xF57C00);
-        case Machine::PS1:    return Rgba(0x0070D1);
-        case Machine::PSP:    return Rgba(0x263238);
-        case Machine::ARCADE: return Rgba(0xD81B60);
+        case Machine::FC:     return Rgba(0xE65B59);  // 珊瑚红
+        case Machine::SFC:    return Rgba(0x9B91C9);  // 薰衣草紫
+        case Machine::GB:     return Rgba(0x9BAA7A);  // 灰橄榄绿
+        case Machine::GBC:    return Rgba(0x55B8A1);  // 透明青绿
+        case Machine::GBA:    return Rgba(0x7965B7);  // 掌机紫
+        case Machine::NDS:    return Rgba(0x77B7D9);  // 天空蓝
+        case Machine::N3DS:   return Rgba(0x4E83D4);  // 亮钴蓝
+        case Machine::NGC:    return Rgba(0x7665B6);  // 游戏机紫
+        case Machine::WII:    return Rgba(0x80C9D8);  // 冰川青
+        case Machine::MD:     return Rgba(0x405A92);  // 世嘉蓝
+        case Machine::SS:     return Rgba(0xA68ABF);  // 土星紫
+        case Machine::DC:     return Rgba(0xE58B68);  // 梦幻橙
+        case Machine::PS1:    return Rgba(0xA7A6A0);  // 经典银灰
+        case Machine::PSP:    return Rgba(0x747D91);  // 石板灰
+        case Machine::ARCADE: return Rgba(0xE6A83D);  // 街机金
         case Machine::Unknown:
         case Machine::Count:
         default:              return Rgba(0x9E9E9E);
@@ -103,8 +106,38 @@ constexpr uint32_t MachineBadgeColorU32(Machine m) {
            (static_cast<uint32_t>(c.g) << 8) | static_cast<uint32_t>(c.r);
 }
 
-constexpr Color kMachineBadgeTextColor = Rgba(0xFFFFFF);
 constexpr Color kMachineBadgeFallbackColor = Rgba(0x9E9E9E);
+constexpr Color kMachineBadgeInkColor = Rgba(0x2B2B2B);   // 浅色徽标上的深色字
+constexpr Color kMachineBadgeWhiteColor = Rgba(0xFFFFFF); // 深色徽标上的白色字
+
+// 通道线性化近似（gamma 2.0），返回 0~1000
+constexpr uint32_t ChannelLuminance(uint8_t c) {
+    return (static_cast<uint32_t>(c) * c * 1000u) / (255u * 255u);
+}
+
+// 相对亮度，返回 0~1000
+constexpr uint32_t RelativeLuminance(Color c) {
+    return (299u * ChannelLuminance(c.r) + 587u * ChannelLuminance(c.g) +
+            114u * ChannelLuminance(c.b)) / 1000u;
+}
+
+// 对比度（WCAG 公式，亮度已放大 1000 倍）
+constexpr uint32_t ContrastRatio1000(uint32_t l1, uint32_t l2) {
+    const uint32_t hi = l1 > l2 ? l1 : l2;
+    const uint32_t lo = l1 > l2 ? l2 : l1;
+    return (hi + 50u) * 1000u / (lo + 50u);
+}
+
+// 徽标文字色：浅色印象色用深色字，深色印象色用白字，按对比度自动选择，
+// 避免为每个机种单独维护文字色。
+constexpr Color MachineBadgeTextColor(Machine m) {
+    const uint32_t bg = RelativeLuminance(MachineBadgeColor(m));
+    const uint32_t ink = RelativeLuminance(kMachineBadgeInkColor);
+    const uint32_t white = RelativeLuminance(kMachineBadgeWhiteColor);
+    return ContrastRatio1000(bg, ink) >= ContrastRatio1000(bg, white)
+               ? kMachineBadgeInkColor
+               : kMachineBadgeWhiteColor;
+}
 
 // ---------------------------------------------------------------------------
 // 名称
