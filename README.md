@@ -62,6 +62,7 @@ JiaoZiPi/
 │       ├── log/            # 日志系统（独立模块，可整体迁移）
 │       ├── i18n/           # 多语言系统（独立模块，可整体迁移）
 │       ├── format/         # 字符串格式化（header-only，供上面两个模块共用）
+│       ├── paths/          # 数据根目录管理（设置路径 / 建目录 / 覆盖解析）
 │       └── JiaoZiPiMachine.h  # 机种枚举与徽标配色
 ├── resources/              # 资源目录
 │   ├── fonts/              # 字体
@@ -96,6 +97,7 @@ JiaoZiPi/
 
 - 日志：等级过滤、控制台 / 文件（实时写入、按大小轮转）/ 回调输出端，底层用 spdlog，用法见 [log/README.md](src/utils/log/README.md)
 - 多语言：单个 [language.json](resources/lang/language.json) 管所有语言（`key → { 语言: 文本 }`），查找链「当前语言 → 同语言族 → 回退语言 → key」，用法见 [i18n/README.md](src/utils/i18n/README.md)
+- 数据目录：设置/拼接数据根路径、递归建目录、可写探测，支持 `--data-dir` 与环境变量覆盖，规范见 [docs/data_paths.md](docs/data_paths.md)，用法见 [paths/README.md](src/utils/paths/README.md)
 
 两者对第三方库只做 header-only 依赖（spdlog / nlohmann-json），首次克隆后先拉取子模块：
 

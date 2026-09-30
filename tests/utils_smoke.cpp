@@ -2,7 +2,8 @@
 //
 // 构建（可直接用 tools/build_utils_test.sh）：
 //   c++ -std=c++17 -Wall -Wextra -I src/utils -I third_party/spdlog/include \
-//       src/utils/log/Logger.cpp src/utils/i18n/I18n.cpp tests/utils_smoke.cpp -o tests/utils_smoke
+//       src/utils/log/Logger.cpp src/utils/i18n/I18n.cpp src/utils/paths/DataPaths.cpp \
+//       tests/utils_smoke.cpp -o tests/utils_smoke
 // 运行：在仓库根目录执行 ./tests/utils_smoke（语言文件按 resources/lang 相对路径加载）
 
 #include <cstdio>
@@ -12,6 +13,7 @@
 
 #include "i18n/I18n.h"
 #include "log/Logger.h"
+#include "paths/DataPaths.h"
 
 #if defined(_WIN32)
 #include <direct.h>
@@ -105,6 +107,70 @@ void TestI18n() {
     tr.SetLocale("zh");
     Check(i18n::Tr("app.tagline") == "多核心模拟器前端", "全局便捷接口 i18n::Tr");
     Check(i18n::Tr("menu.cores") == "核心管理", "全局便捷接口：无参数");
+}
+
+// 数据根目录模块
+void TestDataPaths() {
+    std::printf("[paths]\n");
+    MAKE_DIR("tests/tmp_utils_test");
+
+    Check(paths::Normalize("a\\b//c/") == "a/b/c", "Normalize：反斜杠、重复与末尾斜杠");
+    Check(paths::Normalize("sdmc://JiaoZiPi//config") == "sdmc:/JiaoZiPi/config", "Normalize：设备前缀");
+    Check(paths::Normalize("C:\\Games\\JiaoZiPi") == "C:/Games/JiaoZiPi", "Normalize：盘符");
+    Check(paths::Join("sdmc:/JiaoZiPi", "logs") == "sdmc:/JiaoZiPi/logs", "Join 拼接子目录");
+    Check(paths::Join("sdmc:/JiaoZiPi", "/abs") == "/abs", "Join：child 为绝对路径时覆盖");
+    Check(paths::ParentDirectory("sdmc:/JiaoZiPi/logs") == "sdmc:/JiaoZiPi", "ParentDirectory");
+    Check(paths::FileName("a/b/c.txt") == "c.txt", "FileName");
+    Check(paths::IsAbsolute("/x") && paths::IsAbsolute("C:/x") && paths::IsAbsolute("sdmc:/x") &&
+              !paths::IsAbsolute("x/y"),
+          "IsAbsolute");
+
+    const std::string root = "tests/tmp_utils_test/JiaoZiPi";
+    Check(paths::MakeDirectories(root + "/config/deep"), "递归创建多级目录");
+    Check(paths::DirectoryExists(root + "/config/deep"), "创建的目录存在");
+    Check(paths::IsWritableDirectory(root), "目录可写探测（探针文件自删）");
+
+    paths::DataRoot& dataRoot = paths::DataRoot::Default();
+    dataRoot.Clear();
+    Check(!dataRoot.IsSet() && dataRoot.Get().empty(), "默认未设置数据根目录");
+    Check(!dataRoot.EnsureLayout() && !dataRoot.LastError().empty(), "未设置时创建失败并记录原因");
+
+    paths::SetDataRoot(root + "/");  // 顺带验证规范化
+    Check(paths::DataRootPath() == root, "设置数据根目录（自动规范化）");
+    Check(paths::DataPath("logs") == root + "/logs", "DataPath 拼接");
+    Check(paths::EnsureDataDirectories(), "按规范创建全部子目录");
+
+    bool allCreated = true;
+    for (const char* name : paths::kSubDirectories) {
+        if (!paths::DirectoryExists(paths::DataPath(name))) {
+            allCreated = false;
+        }
+    }
+    Check(allCreated, "规范里的 10 个子目录都已创建");
+
+    char arg0[] = "app";
+    char arg1[] = "--data-dir";
+    char arg2[] = "rel/dir";
+    char* argvSeparate[] = {arg0, arg1, arg2, nullptr};
+    Check(paths::ResolveDataRootOverride(3, argvSeparate) == "rel/dir", "覆盖：--data-dir <path>");
+    char argEquals[] = "--data-dir=rel/eq";
+    char* argvEquals[] = {arg0, argEquals, nullptr};
+    Check(paths::ResolveDataRootOverride(2, argvEquals) == "rel/eq", "覆盖：--data-dir=<path>");
+    char* argvEmpty[] = {arg0, nullptr};
+    Check(paths::ResolveDataRootOverride(1, argvEmpty).empty(), "无参数且无环境变量时返回空");
+#if defined(_WIN32)
+    _putenv_s("JZP_TEST_DATA_DIR", "env/dir");
+#else
+    setenv("JZP_TEST_DATA_DIR", "env/dir", 1);
+#endif
+    Check(paths::ResolveDataRootOverride(1, argvEmpty, "JZP_TEST_DATA_DIR") == "env/dir",
+          "覆盖：回退到环境变量");
+
+    REMOVE_DIR((root + "/config/deep").c_str());
+    for (const char* name : paths::kSubDirectories) {
+        REMOVE_DIR(paths::DataPath(name).c_str());
+    }
+    REMOVE_DIR(root.c_str());
 }
 
 void TestLogger() {
@@ -212,6 +278,7 @@ void TestLogger() {
 
 int main() {
     TestI18n();
+    TestDataPaths();
     TestLogger();
     std::printf("\n%s（失败 %d 项）\n", g_failures == 0 ? "ALL PASS" : "FAILED", g_failures);
     return g_failures == 0 ? 0 : 1;

@@ -66,6 +66,8 @@ const AppPaths& Paths();
 bool EnsureAppDirectories();   // 启动时一次性创建，失败写日志并降级
 ```
 
+**实现分工**：根目录的保存、拼接、创建与覆盖解析已在 [src/utils/paths](../src/utils/paths/README.md) 实现（`SetDataRoot()` / `DataPath()` / `EnsureDataDirectories()` / `ResolveDataRootOverride()`）；`src/platform/` 只负责算出各平台的默认根路径并把它传进去。
+
 ## 覆盖机制
 
 - 环境变量 `JIAOZIPI_DATA_DIR` 优先于平台默认值

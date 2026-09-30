@@ -12,6 +12,7 @@ CXX="${CXX:-c++}"
     -I third_party/spdlog/include \
     -I third_party/json/include \
     src/utils/log/Logger.cpp \
+    src/utils/paths/DataPaths.cpp \
     src/utils/i18n/I18n.cpp \
     tests/utils_smoke.cpp \
     -o tests/utils_smoke

@@ -3,8 +3,8 @@
 放什么：
 
 - 每个目标平台一个实现（如 `switch/`、`desktop/`、`android/`）
-- 数据目录解析与创建（根路径、子目录、只读资源根），规范见 [docs/data_paths.md](../../docs/data_paths.md)
-- 窗口与渲染后端、文件系统路径（romfs / SD 卡）、输入源、时钟、休眠与退出
+- 只负责算出各平台的**默认数据根路径**（可执行文件目录 / Documents / `/sdcard` / `sdmc:`）与只读资源根，路径的保存、拼接、创建、覆盖解析由 [src/utils/paths](../utils/paths/README.md) 负责，规范见 [docs/data_paths.md](../../docs/data_paths.md)
+- 窗口与渲染后端、文件系统挂载、输入源、时钟、休眠与退出
 
 约定：
 
