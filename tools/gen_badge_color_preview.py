@@ -15,6 +15,16 @@ import zlib
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HEADER = os.path.join(ROOT, "src", "utils", "JiaoZiPiMachine.h")
 DEFAULT_OUT = os.path.join(ROOT, "docs", "badge_colors.png")
+DEFAULT_HTML = os.path.join(ROOT, "docs", "badge_colors.html")
+
+# 仅用于预览页显示的中文机种名（颜色与名称均以头文件为准）
+ZH_NAMES = {
+    "FC": "红白机", "SFC": "超级任天堂", "GB": "Game Boy", "GBC": "Game Boy Color",
+    "GBA": "Game Boy Advance", "NDS": "Nintendo DS", "N3DS": "Nintendo 3DS",
+    "NGC": "GameCube", "WII": "Wii", "MD": "Mega Drive", "SS": "世嘉土星",
+    "DC": "Dreamcast", "PS1": "PlayStation", "PSP": "PlayStation Portable",
+    "ARCADE": "街机",
+}
 
 # --- 5x7 点阵字体（仅包含本脚本用到的字符） --------------------------------
 FONT = {
@@ -134,14 +144,103 @@ def parse_header():
     colors = dict(re.findall(r"case Machine::(\w+):\s*return Rgba\(0x([0-9A-Fa-f]{6})\)",
                              section("MachineBadgeColor")))
     labels = dict(re.findall(r'case Machine::(\w+):\s*return "([^"]*)"', section("MachineLabel")))
+    names = dict(re.findall(r'case Machine::(\w+):\s*return "([^"]*)"', section("MachineName")))
     order = re.findall(r"case Machine::(\w+)\s*=", src) or list(colors)
     order = [k for k in order if k in colors and labels.get(k) not in (None, "?")]
-    return order, colors, labels
+    return order, colors, labels, names
+
+
+def mix(hex_str, target, p):
+    """hex_str 向 target(FF/00) 混合 p 比例，用于预览页的高光/描边示意。"""
+    src = tuple(int(hex_str[i:i + 2], 16) for i in (0, 2, 4))
+    tgt = 255 if target == "FF" else 0
+    return "#%02X%02X%02X" % tuple(round(s + (tgt - s) * p) for s in src)
+
+
+PAGE = """<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JiaoZiPi 机种主题色规范</title>
+<style>
+  :root { --base: #FAF7F0; --ink: #2E2A26; --muted: #8C857A; --line: #E8E1D5; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 40px 32px 64px; background: var(--base); color: var(--ink);
+         font: 14px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  h1 { margin: 0 0 6px; font-size: 22px; letter-spacing: .06em; }
+  .sub { margin: 0 0 32px; color: var(--muted); font-size: 12px; }
+  .grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+  .card { border: 1px solid var(--line); border-radius: 14px; background: #FFFDF9; padding: 16px; }
+  .head { display: flex; align-items: center; gap: 12px; }
+  .badge { width: 84px; height: 44px; border-radius: 10px; background: var(--c); color: var(--on);
+           display: flex; align-items: center; justify-content: center; font-weight: 700;
+           font-size: 15px; letter-spacing: .08em; border: 1px solid var(--shade); }
+  .meta { min-width: 0; }
+  .name { font-weight: 700; }
+  .en { color: var(--muted); font-size: 12px; }
+  .hex { margin: 12px 0 14px; color: var(--shade); font-size: 13px; }
+  .samples { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .tag { border-radius: 999px; padding: 3px 12px; font-size: 12px;
+         background: var(--tint); color: var(--shade); border: 1px solid transparent; }
+  .tag.selected { border-color: var(--c); color: var(--ink); box-shadow: 0 0 0 3px var(--tint); }
+  .swatch { width: 100%; height: 26px; border-radius: 6px; background: var(--c); margin-top: 12px; }
+  footer { margin-top: 36px; color: var(--muted); font-size: 12px; }
+  code { color: var(--ink); }
+</style>
+</head>
+<body>
+  <h1>JiaoZiPi 机种主题色规范</h1>
+  <p class="sub">__COUNT__ 个机种 · 浅色低饱和印象色 · 由 tools/gen_badge_color_preview.py 生成自 src/utils/JiaoZiPiMachine.h</p>
+  <div class="grid">
+__CARDS__
+  </div>
+  <footer>白字徽标：__WHITE__ · 其余为深色字 __INK__（由 MachineBadgeTextColor() 按对比度自动选择）</footer>
+</body>
+</html>
+"""
+
+CARD = """    <article class="card" style="--c:{hex};--on:{on};--shade:{shade};--tint:{tint}">
+      <div class="head">
+        <div class="badge">{label}</div>
+        <div class="meta">
+          <div class="name">{zh}</div>
+          <div class="en">{en}</div>
+        </div>
+      </div>
+      <div class="hex">{hex}</div>
+      <div class="samples">
+        <span class="tag">游戏列表</span>
+        <span class="tag selected">选中</span>
+      </div>
+      <div class="swatch"></div>
+    </article>
+"""
+
+
+def emit_html(order, colors, labels, names, path):
+    cards, white = [], []
+    for key in order:
+        hex_str = colors[key].upper()
+        rgb = tuple(int(hex_str[i:i + 2], 16) for i in (0, 2, 4))
+        on = "#2B2B2B" if text_color_on(rgb) == INK else "#FFFFFF"
+        if on == "#FFFFFF":
+            white.append(key)
+        cards.append(CARD.format(hex="#" + hex_str, on=on, shade=mix(hex_str, "00", .35),
+                                 tint=mix(hex_str, "FF", .78), label=labels[key],
+                                 zh=ZH_NAMES.get(key, key),
+                                 en=names.get(key, "")))
+    html = (PAGE.replace("__CARDS__", "".join(cards))
+                .replace("__COUNT__", str(len(order)))
+                .replace("__WHITE__", "、".join(white))
+                .replace("__INK__", "#2B2B2B"))
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(html)
 
 
 def main():
     out = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_OUT
-    order, colors, labels = parse_header()
+    order, colors, labels, names = parse_header()
     if not order:
         sys.exit("未从 %s 解析到机种颜色" % HEADER)
 
@@ -171,7 +270,9 @@ def main():
 
     os.makedirs(os.path.dirname(out), exist_ok=True)
     write_png(out, w, h, buf)
+    emit_html(order, colors, labels, names, DEFAULT_HTML)
     print("%s  (%d 机种, %dx%d)" % (out, len(order), w, h))
+    print(DEFAULT_HTML)
 
 
 if __name__ == "__main__":

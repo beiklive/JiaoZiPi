@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JiaoZiPi 机种主题色规范</title>
+<style>
+  :root { --base: #FAF7F0; --ink: #2E2A26; --muted: #8C857A; --line: #E8E1D5; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 40px 32px 64px; background: var(--base); color: var(--ink);
+         font: 14px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  h1 { margin: 0 0 6px; font-size: 22px; letter-spacing: .06em; }
+  .sub { margin: 0 0 32px; color: var(--muted); font-size: 12px; }
+  .grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+  .card { border: 1px solid var(--line); border-radius: 14px; background: #FFFDF9; padding: 16px; }
+  .head { display: flex; align-items: center; gap: 12px; }
+  .badge { width: 84px; height: 44px; border-radius: 10px; background: var(--c); color: var(--on);
+           display: flex; align-items: center; justify-content: center; font-weight: 700;
+           font-size: 15px; letter-spacing: .08em; border: 1px solid var(--shade); }
+  .meta { min-width: 0; }
+  .name { font-weight: 700; }
+  .en { color: var(--muted); font-size: 12px; }
+  .hex { margin: 12px 0 14px; color: var(--shade); font-size: 13px; }
+  .samples { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .tag { border-radius: 999px; padding: 3px 12px; font-size: 12px;
+         background: var(--tint); color: var(--shade); border: 1px solid transparent; }
+  .tag.selected { border-color: var(--c); color: var(--ink); box-shadow: 0 0 0 3px var(--tint); }
+  .swatch { width: 100%; height: 26px; border-radius: 6px; background: var(--c); margin-top: 12px; }
+  footer { margin-top: 36px; color: var(--muted); font-size: 12px; }
+  code { color: var(--ink); }
+</style>
+</head>
+<body>
+  <h1>JiaoZiPi 机种主题色规范</h1>
+  <p class="sub">15 个机种 · 浅色低饱和印象色 · 由 tools/gen_badge_color_preview.py 生成自 src/utils/JiaoZiPiMachine.h</p>
+  <div class="grid">
+    <article class="card" style="--c:#E65B59;--on:#2B2B2B;--shade:#963B3A;--tint:#FADBDA">
+      <div class="head">
+        <div class="badge">FC</div>
+        <div class="meta">
+          <div class="name">红白机</div>
+          <div class="en">Famicom / NES</div>
+        </div>
+      </div>
+      <div class="hex">#E65B59</div>
+      <div class="samples">
+        <span class="tag">游戏列表</span>
+        <span class="tag selected">选中</span>
+      </div>
+      <div class="swatch"></div>
+    </article>
+    <article class="card" style="--c:#9B91C9;--on:#2B2B2B;--shade:#655E83;--tint:#E9E7F3">
+      <div class="head">
+        <div class="badge">SFC</div>
+        <div class="meta">
+          <div class="name">超级任天堂</div>
+          <div class="en">Super Famicom / SNES</div>
+        </div>
+      </div>
+      <div class="hex">#9B91C9</div>
+      <div class="samples">
+        <span class="tag">游戏列表</span>
+        <span class="tag selected">选中</span>
+      </div>
+      <div class="swatch"></div>
+    </article>
+    <article class="card" style="--c:#9BAA7A;--on:#2B2B2B;--shade:#656E4F;--tint:#E9ECE2">
+      <div class="head">
+        <div class="badge">GB</div>
+        <div class="meta">
+          <div class="name">Game Boy</div>
+          <div class="en">Game Boy</div>
+        </div>
+      </div>
+      <div class="hex">#9BAA7A</div>
+      <div class="samples">
+        <span class="tag">游戏列表</span>
+        <span class="tag selected">选中</span>
+      </div>
+      <div class="swatch"></div>
+    </article>
+    <article class="card" style="--c:#55B8A1;--on:#2B2B2B;--shade:#377869;--tint:#DAEFEA">
+      <div class="head">
+        <div class="badge">GBC</div>
+        <div class="meta">
+          <div class="name">Game Boy Color</div>
+          <div class="en">Game Boy Color</div>
+        </div>
+      </div>
+      <div class="hex">#55B8A1</div>
+      <div class="samples">
+        <span class="tag">游戏列表</span>
+        <span class="tag selected">选中</span>
+      </div>
+      <div class="swatch"></div>
+    </article>
+    <article class="card" style="--c:#8A6FD1;--on:#2B2B2B;--shade:#5A4888;--tint:#E5DFF5">
+      <div class="head">
+        <div class="badge">GBA</div>
+        <div class="meta">
+          <div class="name">Game Boy Advance</div>
+          <div class="en">Game Boy Advance</div>
+        </div>
+      </div>
+      <div class="hex">#8A6FD1</div>
+      <div class="samples">
+        <span class="tag">游戏列表</span>
+        <span class="tag selected">选中</span>
+      </div>
+      <div class="swatch"></div>
+    </article>
+    <article class="card" style="--c:#77B7D9;--on:#2B2B2B;--shade:#4D778D;--tint:#E1EFF7">
+      <div class="head">
+        <div class="badge">NDS</div>
+        <div class="meta">
+          <div class="name">Nintendo DS</div>
+          <div class="en">Nintendo DS</div>
+        </div>
+      </div>
+      <div class="hex">#77B7D9</div>
+      <div class="samples">
+        <span class="tag">游戏列表</span>
+        <span class="tag selected">选中</span>
+      </div>
+      <div class="swatch"></div>
+    </article>
+    <article class="card" style="--c:#4E83D4;--on:#2B2B2B;--shade:#33558A;--tint:#D8E4F6">
+      <div class="head">
+        <div class="badge">3DS</div>
+        <div class="meta">
+          <div class="name">Nintendo 3DS</div>
+          <div class="en">Nintendo 3DS</div>
+        </div>
+      </div>
+      <div class="hex">#4E83D4</div>
+      <div class="samples">
+        <span class="tag">游戏列表</span>
+        <span class="tag selected">选中</span>
+      </div>
+      <div class="swatch"></div>
+    </article>
+    <article class="card" style="--c:#7665B6;--on:#FFFFFF;--shade:#4D4276;--tint:#E1DDEF">
+      <div class="head">
+        <div class="badge">NGC</div>
+        <div class="meta">
+          <div class="name">GameCube</div>
+          <div class="en">Nintendo GameCube</div>
+        </div>
+      </div>
+      <div class="hex">#7665B6</div>
+      <div class="samples">
+        <span class="tag">游戏列表</span>
+        <span class="tag selected">选中</span>
+      </div>
+      <div class="swatch"></div>
+    </article>
+    <article class="card" style="--c:#80C9D8;--on:#2B2B2B;--shade:#53838C;--tint:#E3F3F6">
+      <div class="head">
+        <div class="badge">WII</div>
+        <div class="meta">
+          <div class="name">Wii</div>
+          <div class="en">Nintendo Wii</div>
+        </div>
+      </div>
+      <div class="hex">#80C9D8</div>
+      <div class="samples">
+        <span class="tag">游戏列表</span>
+        <span class="tag selected">选中</span>
+      </div>
+      <div class="swatch"></div>
+    </article>
+    <article class="card" style="--c:#405A92;--on:#FFFFFF;--shade:#2A3A5F;--tint:#D5DBE7">
+      <div class="head">
+        <div class="badge">MD</div>
+        <div class="meta">
+          <div class="name">Mega Drive</div>
+          <div class="en">Mega Drive / Genesis</div>
+        </div>
+      </div>
+      <div class="hex">#405A92</div>
+      <div class="samples">
+        <span class="tag">游戏列表</span>
+        <span class="tag selected">选中</span>
+      </div>
+      <div class="swatch"></div>
+    </article>
+    <article class="card" style="--c:#A68ABF;--on:#2B2B2B;--shade:#6C5A7C;--tint:#EBE5F1">
+      <div class="head">
+        <div class="badge">SS</div>
+        <div class="meta">
+          <div class="name">世嘉土星</div>
+          <div class="en">Sega Saturn</div>
+        </div>
+      </div>
+      <div class="hex">#A68ABF</div>
+      <div class="samples">
+        <span class="tag">游戏列表</span>
+        <span class="tag selected">选中</span>
+      </div>
+      <div class="swatch"></div>
+    </article>
+    <article class="card" style="--c:#E58B68;--on:#2B2B2B;--shade:#955A44;--tint:#F9E5DE">
+      <div class="head">
+        <div class="badge">DC</div>
+        <div class="meta">
+          <div class="name">Dreamcast</div>
+          <div class="en">Dreamcast</div>
+        </div>
+      </div>
+      <div class="hex">#E58B68</div>
+      <div class="samples">
+        <span class="tag">游戏列表</span>
+        <span class="tag selected">选中</span>
+      </div>
+      <div class="swatch"></div>
+    </article>
+    <article class="card" style="--c:#A7A6A0;--on:#2B2B2B;--shade:#6D6C68;--tint:#ECEBEA">
+      <div class="head">
+        <div class="badge">PS1</div>
+        <div class="meta">
+          <div class="name">PlayStation</div>
+          <div class="en">PlayStation</div>
+        </div>
+      </div>
+      <div class="hex">#A7A6A0</div>
+      <div class="samples">
+        <span class="tag">游戏列表</span>
+        <span class="tag selected">选中</span>
+      </div>
+      <div class="swatch"></div>
+    </article>
+    <article class="card" style="--c:#747D91;--on:#2B2B2B;--shade:#4B515E;--tint:#E0E2E7">
+      <div class="head">
+        <div class="badge">PSP</div>
+        <div class="meta">
+          <div class="name">PlayStation Portable</div>
+          <div class="en">PlayStation Portable</div>
+        </div>
+      </div>
+      <div class="hex">#747D91</div>
+      <div class="samples">
+        <span class="tag">游戏列表</span>
+        <span class="tag selected">选中</span>
+      </div>
+      <div class="swatch"></div>
+    </article>
+    <article class="card" style="--c:#E6A83D;--on:#2B2B2B;--shade:#966D28;--tint:#FAECD4">
+      <div class="head">
+        <div class="badge">ARCADE</div>
+        <div class="meta">
+          <div class="name">街机</div>
+          <div class="en">Arcade</div>
+        </div>
+      </div>
+      <div class="hex">#E6A83D</div>
+      <div class="samples">
+        <span class="tag">游戏列表</span>
+        <span class="tag selected">选中</span>
+      </div>
+      <div class="swatch"></div>
+    </article>
+
+  </div>
+  <footer>白字徽标：NGC、MD · 其余为深色字 #2B2B2B（由 MachineBadgeTextColor() 按对比度自动选择）</footer>
+</body>
+</html>
