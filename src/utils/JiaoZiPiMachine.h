@@ -82,7 +82,7 @@ constexpr Color MachineBadgeColor(Machine m) {
         case Machine::SFC:    return Rgba(0x9B91C9);  // 薰衣草紫
         case Machine::GB:     return Rgba(0x9BAA7A);  // 灰橄榄绿
         case Machine::GBC:    return Rgba(0x55B8A1);  // 透明青绿
-        case Machine::GBA:    return Rgba(0x7965B7);  // 掌机紫
+        case Machine::GBA:    return Rgba(0x8A6FD1);  // 掌机紫（比 NGC 更亮，避免两紫难分）
         case Machine::NDS:    return Rgba(0x77B7D9);  // 天空蓝
         case Machine::N3DS:   return Rgba(0x4E83D4);  // 亮钴蓝
         case Machine::NGC:    return Rgba(0x7665B6);  // 游戏机紫
