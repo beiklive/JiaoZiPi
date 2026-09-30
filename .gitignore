@@ -10,6 +10,10 @@ out/
 *.nsp
 *.elf
 
+# 运行期日志
+logs/
+*.log
+
 # 编辑与系统
 .DS_Store
 .idea/

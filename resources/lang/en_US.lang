@@ -1,0 +1,34 @@
+# JiaoZiPi English language table
+# Format: key = value
+# Lines starting with # or ; are comments; {} is a runtime placeholder; escapes: \n \t \\
+
+app.name = JiaoZiPi
+app.tagline = Multi-core emulator frontend
+
+menu.library = Library
+menu.settings = Settings
+menu.cores = Cores
+menu.about = About
+menu.quit = Quit
+
+library.empty = No games yet, scan a folder first
+library.scanning = Scanning: {}
+library.count = {} games
+
+settings.language = Language
+settings.theme = Theme
+settings.log_level = Log level
+
+core.missing = Missing {} core
+core.load_failed = Failed to load core: {}
+
+status.fast_forward = Fast forward
+status.rewind = Rewind
+status.cheat = Cheats
+status.overlay = Overlay
+status.shader = Shader
+
+greeting = Hello, {}
+
+# 仅英文表存在的 key，用于验证回退链
+app.build = development build

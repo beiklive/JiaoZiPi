@@ -1,0 +1,31 @@
+# JiaoZiPi 简体中文语言表
+# 格式：key = value
+# # 或 ; 开头为注释；{} 为运行时占位符；反斜杠转义：\n \t \\ 
+
+app.name = 饺子皮
+app.tagline = 多核心模拟器前端
+
+menu.library = 游戏库
+menu.settings = 设置
+menu.cores = 核心管理
+menu.about = 关于
+menu.quit = 退出
+
+library.empty = 还没有游戏，先扫描一下目录吧
+library.scanning = 正在扫描：{}
+library.count = 共 {} 个游戏
+
+settings.language = 语言
+settings.theme = 主题
+settings.log_level = 日志等级
+
+core.missing = 缺少 {} 核心
+core.load_failed = 核心加载失败：{}
+
+status.fast_forward = 快进
+status.rewind = 倒带
+status.cheat = 金手指
+status.overlay = 遮罩
+status.shader = 滤镜
+
+greeting = 你好，{}

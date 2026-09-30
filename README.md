@@ -59,6 +59,10 @@ JiaoZiPi/
 │   ├── ui/                 # 界面
 │   ├── platform/           # 平台适配层
 │   └── utils/              # 通用工具
+│       ├── log/            # 日志系统（独立模块，可整体迁移）
+│       ├── i18n/           # 多语言系统（独立模块，可整体迁移）
+│       ├── format/         # 字符串格式化（header-only，供上面两个模块共用）
+│       └── JiaoZiPiMachine.h  # 机种枚举与徽标配色
 ├── resources/              # 资源目录
 │   ├── fonts/              # 字体
 │   ├── icons/              # 图标
@@ -83,6 +87,21 @@ JiaoZiPi/
 - 新增平台适配放在 `src/platform/`，不改动上层逻辑。
 - 所有运行时资源放在 `resources/`，按类型分目录。
 - 模拟器核心源码或子模块放在 `third_party/`，与前端代码隔离。
+
+## 内置基础模块
+
+`src/utils/` 下的 `log/` 与 `i18n/` 是不依赖本项目任何代码的独立模块，可整目录复制到其他工程：
+
+- 日志：等级过滤、控制台 / 文件（实时写入、按大小轮转）/ 回调输出端，用法见 [log/README.md](src/utils/log/README.md)
+- 多语言：UTF-8 文本语言表 + 运行时注册，查找链「当前语言 → 同语言族 → 回退语言 → key」，用法见 [i18n/README.md](src/utils/i18n/README.md)
+
+冒烟测试：
+
+```bash
+c++ -std=c++17 -Wall -Wextra -I src/utils \
+    src/utils/log/Logger.cpp src/utils/i18n/I18n.cpp tests/utils_smoke.cpp -o tests/utils_smoke
+./tests/utils_smoke
+```
 
 ## 开发计划
 
