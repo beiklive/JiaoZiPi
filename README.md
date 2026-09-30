@@ -50,8 +50,39 @@
 
 ```text
 JiaoZiPi/
+├── src/                    # 代码目录
+│   ├── app/                # 程序入口与生命周期
+│   ├── core/               # 核心加载与管理（核心接入层）
+│   ├── emulator/           # 运行调度：暂停 / 快进 / 倒带 / 存档
+│   ├── config/             # 配置系统
+│   ├── input/              # 输入与按键映射
+│   ├── ui/                 # 界面
+│   ├── platform/           # 平台适配层
+│   └── utils/              # 通用工具
+├── resources/              # 资源目录
+│   ├── fonts/              # 字体
+│   ├── icons/              # 图标
+│   ├── images/             # 图片
+│   ├── sounds/             # 音效
+│   ├── lang/               # 多语言文本
+│   ├── shaders/            # 滤镜
+│   ├── overlays/           # 遮罩
+│   ├── cheats/             # 金手指
+│   └── themes/             # 主题
+├── third_party/            # 第三方代码与模拟器核心
+├── docs/                   # 文档
+├── tools/                  # 辅助脚本与工具
+├── tests/                  # 测试
+├── .gitignore
 └── README.md
 ```
+
+约定：
+
+- 代码统一放在 `src/`，头文件与实现文件同目录。
+- 新增平台适配放在 `src/platform/`，不改动上层逻辑。
+- 所有运行时资源放在 `resources/`，按类型分目录。
+- 模拟器核心源码或子模块放在 `third_party/`，与前端代码隔离。
 
 ## 开发计划
 

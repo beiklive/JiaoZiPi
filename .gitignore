@@ -1,0 +1,17 @@
+# 构建产物
+build/
+build-*/
+out/
+*.o
+*.a
+*.so
+*.dylib
+*.nro
+*.nsp
+*.elf
+
+# 编辑与系统
+.DS_Store
+.idea/
+.vscode/
+*.swp
