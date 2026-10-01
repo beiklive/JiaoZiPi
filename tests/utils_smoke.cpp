@@ -3,6 +3,7 @@
 // 构建（可直接用 tools/build_utils_test.sh）：
 //   c++ -std=c++17 -Wall -Wextra -I src/utils -I third_party/spdlog/include \
 //       src/utils/log/Logger.cpp src/utils/i18n/I18n.cpp src/utils/paths/DataPaths.cpp \
+//       src/utils/cheats/ChtFile.cpp \
 //       tests/utils_smoke.cpp -o tests/utils_smoke
 // 运行：在仓库根目录执行 ./tests/utils_smoke（语言文件按 resources/lang 相对路径加载）
 
@@ -16,6 +17,7 @@
 #include <nlohmann/json.hpp>
 
 #include "JiaoZiPiMachine.h"
+#include "cheats/ChtFile.h"
 #include "paths/DataPaths.h"
 
 #if defined(_WIN32)
@@ -332,6 +334,99 @@ void TestPlatformConfigs() {
     Check(archivesListed, "每个机种都列出了 .zip 与 .7z");
 }
 
+// 金手指 .cht 解析器
+void TestCht() {
+    std::printf("[cheats]\n");
+    MAKE_DIR("tests/tmp_utils_test");
+
+    // RetroArch 风格文件：含未知字段（handler/rumble/repeat）与 CRLF、"+" 多行代码
+    const std::string raw =
+        "\xEF\xBB\xBF"  // BOM
+        "# comment\r\n"
+        "cheats = 2\r\n"
+        "\r\n"
+        "cheat0_desc = \"Infinite Health\"\r\n"
+        "cheat0_code = \"82003208 0063+8200320A 00FF\"\r\n"
+        "cheat0_enable = false\r\n"
+        "cheat0_big_endian = false\r\n"
+        "cheat0_handler = 0\r\n"
+        "cheat0_repeat_count = 0\r\n"
+        "\r\n"
+        "cheat1_desc = \"Max Money\"\r\n"
+        "cheat1_code = \"AAAAAAAA-BBBBBBBB\"\r\n"
+        "cheat1_enable = 1\r\n"
+        "cheat1_big_endian = true\r\n"
+        "version = 1\r\n";  // 文件级未知键
+
+    cht::File file;
+    Check(file.LoadFromString(raw, "sample.cht"), "解析 .cht 文本（BOM / CRLF / 注释）");
+    Check(file.Size() == 2, "条目数正确（cheats = 2）");
+    Check(file.Warnings().empty(), "没有产生警告");
+
+    const cht::Entry* first = file.Get(0);
+    Check(first != nullptr && first->description == "Infinite Health", "读取 desc（去引号）");
+    Check(first != nullptr && first->code == "82003208 0063+8200320A 00FF", "读取 code（+ 多行原样保留）");
+    Check(first != nullptr && !first->enabled && !first->bigEndian, "读取 enable / big_endian");
+    Check(first != nullptr && first->extra.size() == 2, "未知字段被保留（handler / repeat_count）");
+
+    const cht::Entry* second = file.Get(1);
+    Check(second != nullptr && second->enabled, "enable = 1 识别为 true");
+    Check(second != nullptr && second->bigEndian, "big_endian = true 识别");
+    Check(file.CountEnabled() == 1 && file.IndexOfCode("AAAAAAAA-BBBBBBBB") == 1, "统计与查找");
+
+    // 修改后再序列化，未知字段与文件级未知键不能丢
+    file.SetEnabled(0, true);
+    file.SetDescription(0, "无限生命 \"HP\"");
+    file.SetCode(0, "82003208 0063");
+    const std::string rewritten = file.ToString();
+    Check(rewritten.find("cheat0_handler = 0") != std::string::npos &&
+              rewritten.find("cheat0_repeat_count = 0") != std::string::npos,
+          "写回时保留条目级未知字段");
+    Check(rewritten.find("version = 1") != std::string::npos, "写回时保留文件级未知键");
+    Check(rewritten.find("cheats = 2") == 0, "写回的 cheats 计数在首行");
+
+    cht::File reparsed;
+    Check(reparsed.LoadFromString(rewritten, "rewritten.cht"), "重新解析写回内容");
+    Check(reparsed.Get(0) != nullptr && reparsed.Get(0)->code == "82003208 0063", "修改后的 code 生效");
+    Check(reparsed.Get(0) != nullptr && reparsed.Get(0)->description == "无限生命 \"HP\"",
+          "引号与转义往返正确");
+    Check(reparsed.Get(0) != nullptr && reparsed.Get(0)->enabled, "修改后的开关生效");
+
+    // 增删
+    const std::size_t added = file.Add("Debug Mode", "DDDDDDDD-EEEEEEEE", true);
+    Check(added == 2 && file.Size() == 3 && file.CountEnabled() == 3, "新增条目");
+    Check(file.Remove(1) && file.Size() == 2, "删除条目");
+    Check(!file.Remove(99), "越界删除返回 false");
+    file.EnableAll(false);
+    Check(file.CountEnabled() == 0, "批量关闭");
+
+    // 编号跳号与计数不一致
+    cht::File gapped;
+    Check(gapped.LoadFromString("cheats = 3\ncheat0_code = \"AAAA\"\n", "gap.cht"), "解析跳号文件");
+    Check(gapped.Size() == 3 && gapped.Get(1) != nullptr && gapped.Get(1)->code.empty(),
+          "缺失编号用空条目补齐");
+    Check(!gapped.Warnings().empty(), "跳号产生警告");
+
+    cht::File truncated;
+    Check(truncated.LoadFromString("cheats = 1\ncheat0_code = \"A\"\ncheat1_code = \"B\"\n", "t.cht"),
+          "解析计数偏小的文件");
+    Check(truncated.Size() == 2, "按实际条目数读取（不丢被 RA 忽略的条目）");
+
+    cht::File empty;
+    Check(empty.LoadFromString("", "empty.cht") && empty.Empty(), "空文件按空列表处理");
+
+    // 落盘 + 重新读取
+    const std::string path = "tests/tmp_utils_test/cheats.cht";
+    std::remove(path.c_str());
+    Check(file.Save(path), "写回磁盘");
+    Check(paths::FileExists(path), "文件已生成");
+    cht::File loaded;
+    Check(loaded.Load(path) && loaded.Size() == 2, "从磁盘读回");
+    Check(!loaded.Load("tests/tmp_utils_test/not_there.cht") && !loaded.LastError().empty(),
+          "读不到文件时返回 false 并记录原因");
+    std::remove(path.c_str());
+}
+
 void TestLogger() {
     std::printf("[log]\n");
     MAKE_DIR("tests/tmp_utils_test");
@@ -439,6 +534,7 @@ int main() {
     TestI18n();
     TestDataPaths();
     TestPlatformConfigs();
+    TestCht();
     TestLogger();
     std::printf("\n%s（失败 %d 项）\n", g_failures == 0 ? "ALL PASS" : "FAILED", g_failures);
     return g_failures == 0 ? 0 : 1;

@@ -15,6 +15,7 @@ sh tools/build_utils_test.sh              # 构建并运行，需在仓库根目
 c++ -std=c++17 -Wall -Wextra -O1 \
     -I src/utils -I third_party/spdlog/include -I third_party/json/include \
     src/utils/log/Logger.cpp src/utils/i18n/I18n.cpp src/utils/paths/DataPaths.cpp \
+    src/utils/cheats/ChtFile.cpp \
     tests/utils_smoke.cpp -o tests/utils_smoke
 ./tests/utils_smoke
 ```
