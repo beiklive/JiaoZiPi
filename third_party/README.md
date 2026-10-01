@@ -27,6 +27,21 @@ git submodule update --init --recursive
 - `.chd`、`.cso`、`.rvz` 不是归档，是压缩镜像格式，交给核心处理，不要解压。
 - Switch / Android / iOS 上这两个库的构建与依赖（zlib、liblzma 是否可用）需要在目标平台实测后再写进构建脚本。
 
+## 未纳入本仓库的可选依赖
+
+| 依赖 | 用途 | 说明 |
+| --- | --- | --- |
+| glslang（KhronosGroup） | `shader` 模块的 Vulkan/SPIR-V 后端 | 只在核心需要 Vulkan 着色器时才引入；`shader` 模块本身不强制，OpenGL 路径零依赖 |
+
+引入方式（各核心自带，或后续在 `third_party/` 加子模块）：
+
+```bash
+git clone --depth 1 https://github.com/KhronosGroup/glslang
+cmake -S glslang -B build_glslang -DENABLE_OPT=OFF -DGLSLANG_TESTS=OFF -DBUILD_SHARED_LIBS=OFF
+cmake --build build_glslang -j8
+# 编译时：-DJZP_SHADER_WITH_GLSLANG -I glslang -L build_glslang/{glslang,SPIRV,glslang/OSDependent/Unix}
+```
+
 ## 模拟器核心
 
 - 每个核心一个子目录，尽量保持上游原样，本地改动以 patch 或 fork 分支形式记录

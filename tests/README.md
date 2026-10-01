@@ -16,8 +16,16 @@ c++ -std=c++17 -Wall -Wextra -O1 \
     -I src/utils -I third_party/spdlog/include -I third_party/json/include \
     src/utils/log/Logger.cpp src/utils/i18n/I18n.cpp src/utils/paths/DataPaths.cpp \
     src/utils/cheats/ChtFile.cpp \
+    src/utils/shader/*.cpp \
     tests/utils_smoke.cpp -o tests/utils_smoke
 ./tests/utils_smoke
+```
+
+带 glslang 验证 Vulkan/SPIR-V 路径（可选）：
+
+```bash
+GLSLANG_INCLUDE=<glslang 根或安装 include> GLSLANG_LIB=<glslang 构建目录> \
+    sh tools/build_utils_test.sh
 ```
 
 约定：

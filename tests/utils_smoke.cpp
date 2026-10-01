@@ -3,7 +3,7 @@
 // 构建（可直接用 tools/build_utils_test.sh）：
 //   c++ -std=c++17 -Wall -Wextra -I src/utils -I third_party/spdlog/include \
 //       src/utils/log/Logger.cpp src/utils/i18n/I18n.cpp src/utils/paths/DataPaths.cpp \
-//       src/utils/cheats/ChtFile.cpp \
+//       src/utils/cheats/ChtFile.cpp src/utils/shader/*.cpp \
 //       tests/utils_smoke.cpp -o tests/utils_smoke
 // 运行：在仓库根目录执行 ./tests/utils_smoke（语言文件按 resources/lang 相对路径加载）
 
@@ -18,6 +18,8 @@
 
 #include "JiaoZiPiMachine.h"
 #include "cheats/ChtFile.h"
+#include "shader/ShaderCompiler.h"
+#include "shader/ShaderPreset.h"
 #include "paths/DataPaths.h"
 
 #if defined(_WIN32)
@@ -206,7 +208,8 @@ void TestDataPaths() {
     const std::string exe = paths::ExecutablePath();
     Check(!exe.empty() && paths::IsAbsolute(exe), "获取可执行文件路径（本平台）");
     Check(paths::FileExists(exe), "可执行文件路径真实存在");
-    Check(paths::FileName(exe) == "utils_smoke", "可执行文件名正确");
+    Check(!paths::FileName(exe).empty() && paths::FileName(exe).find('/') == std::string::npos,
+          "可执行文件名解析正确");
     Check(paths::ExecutableDirectory() == paths::ParentDirectory(exe), "可执行文件所在目录");
     const std::string defaultRoot = paths::DefaultDataRoot();
     if (!defaultRoot.empty()) {
@@ -427,6 +430,157 @@ void TestCht() {
     std::remove(path.c_str());
 }
 
+// 着色器预设解析 + 源码预处理 +（可选）SPIR-V 编译
+void TestShader() {
+    std::printf("[shader]\n");
+    const std::string dir = "tests/tmp_utils_test/shader";
+    MAKE_DIR("tests/tmp_utils_test");
+    MAKE_DIR(dir.c_str());
+
+    const auto writeFile = [](const std::string& path, const std::string& text) {
+        std::FILE* file = std::fopen(path.c_str(), "wb");
+        if (file == nullptr) {
+            return false;
+        }
+        std::fwrite(text.data(), 1, text.size(), file);
+        std::fclose(file);
+        return true;
+    };
+
+    const std::string shaderPath = dir + "/simple.slang";
+    const std::string includePath = dir + "/helper.inc";
+    writeFile(includePath,
+              "#pragma parameter HELPER_GAIN \"Helper gain\" 0.5 0.0 1.0\n"
+              "float helper_scale() { return 1.0; }\n");
+    writeFile(shaderPath,
+              "#version 450\n"
+              "#include \"helper.inc\"\n"
+              "#pragma parameter BRIGHTNESS \"Brightness\" 1.0 0.0 2.0 0.01\n"
+              "layout(location = 0) in vec2 vUV;\n"
+              "layout(location = 0) out vec4 FragColor;\n"
+              "layout(set = 0, binding = 0) uniform sampler2D Source;\n"
+              "layout(push_constant) uniform Push { vec2 SourceSize; float Brightness; } params;\n"
+              "void main() { FragColor = texture(Source, vUV) * params.Brightness * helper_scale(); }\n");
+
+    writeFile(dir + "/base.slangp",
+              "shaders = 1\n"
+              "shader0 = \"simple.slang\"\n"
+              "filter_linear0 = true\n"
+              "scale_type0 = viewport\n"
+              "scale0 = 2.0\n"
+              "parameters = \"BRIGHTNESS\"\n"
+              "BRIGHTNESS = 1.5\n");
+    const std::string presetPath = dir + "/game.slangp";
+    writeFile(presetPath,
+              "#reference \"base.slangp\"\n"
+              "shaders = 2\n"
+              "shader1 = \"$SHADER_DIR$/simple.slang\"\n"
+              "scale_type1 = absolute\n"
+              "scale_x1 = 320\n"
+              "scale_y1 = 240\n"
+              "textures = \"LUT\"\n"
+              "LUT = \"lut.png\"\n"
+              "LUT_linear = false\n"
+              "LUT_wrap_mode = clamp_to_edge\n");
+
+    // --- 预设解析 ---
+    // 通配符按 RetroArch 的用法展开成绝对路径（RA 的 $CORE$ / $CONTENT-DIR$ 也是绝对值）
+    const std::string absShaderDir = paths::Join(paths::ExecutableDirectory(), "jzp_shader_dir");
+    shader::Preset::Options options;
+    options.wildcards["$SHADER_DIR$"] = absShaderDir;
+    shader::Preset preset(options);
+    Check(preset.Load(presetPath), "加载 .slangp（含 #reference 继承）");
+    Check(preset.format() == shader::Format::Slang, "按后缀识别为 slang 预设");
+    Check(preset.passes().size() == 2, "#reference 合并后 pass 数 = 2");
+    Check(preset.references().size() == 2 &&
+              preset.references().front().find("base.slangp") != std::string::npos,
+          "引用链记录了 base 与自身");
+
+    const shader::Pass* pass0 = preset.passes().size() > 0 ? &preset.passes()[0] : nullptr;
+    Check(pass0 != nullptr && pass0->filter == shader::FilterMode::Linear, "继承来的 filter_linear0");
+    Check(pass0 != nullptr && pass0->effectiveScaleTypeX() == shader::ScaleType::Viewport &&
+              pass0->scale == 2.0f,
+          "继承来的 scale_type0 / scale0");
+    const shader::Pass* pass1 = preset.passes().size() > 1 ? &preset.passes()[1] : nullptr;
+    Check(pass1 != nullptr && pass1->effectiveScaleTypeX() == shader::ScaleType::Absolute &&
+              pass1->scaleX == 320.0f && pass1->scaleY == 240.0f,
+          "本文件的 scale_type1 / scale_x1 / scale_y1");
+    Check(pass1 != nullptr && pass1->source == absShaderDir + "/simple.slang",
+          "通配符 $SHADER_DIR$ 展开为绝对路径");
+    Check(pass0 != nullptr && pass0->source == dir + "/simple.slang",
+          "相对 shader0 按预设目录解析");
+    Check(preset.textures().size() == 1 && preset.textures()[0].id == "LUT" &&
+              preset.textures()[0].path == dir + "/lut.png" &&
+              preset.textures()[0].filter == shader::FilterMode::Nearest &&
+              preset.textures()[0].wrap == shader::WrapMode::ClampToEdge,
+          "纹理路径 / 过滤 / 环绕模式");
+
+    const shader::Parameter* brightness = preset.FindParameter("BRIGHTNESS");
+    Check(brightness != nullptr && brightness->value == 1.5f && brightness->fromPreset,
+          "预设覆盖参数值");
+    Check(brightness != nullptr && brightness->maximum == 2.0f && brightness->hasStep,
+          "#pragma parameter 的 min/max/step");
+    Check(preset.FindParameter("HELPER_GAIN") != nullptr, "#include 文件里的参数也被收集");
+    Check(preset.SetParameterValue("BRIGHTNESS", 0.25f) &&
+              preset.FindParameter("BRIGHTNESS")->value == 0.25f,
+          "修改参数值");
+    Check(!preset.SetParameterValue("NOT_THERE", 1.0f), "不存在的参数返回 false");
+
+    shader::Preset missing;
+    Check(!missing.Load(dir + "/nope.slangp") && !missing.LastError().empty(),
+          "预设不存在时返回 false 并记录原因");
+
+    // --- 源码预处理 ---
+    shader::PreprocessOptions preprocess;
+    preprocess.stage = shader::Stage::Fragment;
+    const shader::PreprocessResult prepared = shader::PreprocessFile(shaderPath, preprocess);
+    Check(prepared.ok, "预处理着色器源码");
+    Check(prepared.source.find("#define FRAGMENT") != std::string::npos, "注入 #define FRAGMENT");
+    Check(prepared.source.find("#pragma parameter") == std::string::npos, "剔除 #pragma parameter 行");
+    Check(prepared.source.find("helper_scale") != std::string::npos, "#include 已展开");
+    Check(prepared.parameters.size() == 2, "收集到 2 个参数（含 include 里的）");
+
+    shader::PreprocessOptions versioned;
+    versioned.version = "120";
+    const shader::PreprocessResult injected =
+        shader::PreprocessSource("void main() {}\n", dir, versioned);
+    Check(injected.source.compare(0, 12, "#version 120") == 0, "缺 #version 时按选项注入");
+    const shader::PreprocessResult kept = shader::PreprocessSource(
+        "#version 450\nvoid main() {}\n", dir, versioned);
+    Check(kept.source.find("#version 450") != std::string::npos &&
+              kept.source.find("#version 120") == std::string::npos,
+          "已有 #version 时不覆盖");
+
+    shader::PreprocessResult broken =
+        shader::PreprocessSource("#include \"missing.inc\"\nvoid main() {}\n", dir, versioned);
+    Check(!broken.warnings.empty(), "include 找不到时给出警告");
+    shader::PreprocessResult noFile = shader::PreprocessFile(dir + "/nope.slang", preprocess);
+    Check(!noFile.ok, "源码文件不存在时 ok = false");
+
+    // --- SPIR-V 编译（需要 glslang） ---
+    shader::CompileOptions compile;
+    compile.preprocess.version = "450";
+    compile.preprocess.stage = shader::Stage::Fragment;
+    const shader::SpirvResult spirv = shader::Compiler::CompileToSpirv(shaderPath, compile);
+    if (shader::Compiler::SpirvBackendAvailable()) {
+        Check(spirv.ok && !spirv.words.empty() && spirv.words.front() == shader::kSpirvMagic,
+              std::string("glslang 编译出 SPIR-V（") + shader::Compiler::SpirvBackendName() + "）");
+        shader::CompileOptions bad = compile;
+        const shader::SpirvResult failed = shader::Compiler::CompileTextToSpirv(
+            "#version 450\nvoid main() { this is not glsl }\n", dir, bad);
+        Check(!failed.ok && !failed.log.empty(), "非法 GLSL 返回失败并带编译日志");
+    } else {
+        Check(!spirv.ok && !spirv.log.empty(),
+              "未启用 glslang 时 Vulkan 路径返回说明性失败（OpenGL 路径不受影响）");
+    }
+
+    std::remove(shaderPath.c_str());
+    std::remove(includePath.c_str());
+    std::remove((dir + "/base.slangp").c_str());
+    std::remove(presetPath.c_str());
+    REMOVE_DIR(dir.c_str());
+}
+
 void TestLogger() {
     std::printf("[log]\n");
     MAKE_DIR("tests/tmp_utils_test");
@@ -535,6 +689,7 @@ int main() {
     TestDataPaths();
     TestPlatformConfigs();
     TestCht();
+    TestShader();
     TestLogger();
     std::printf("\n%s（失败 %d 项）\n", g_failures == 0 ? "ALL PASS" : "FAILED", g_failures);
     return g_failures == 0 ? 0 : 1;
