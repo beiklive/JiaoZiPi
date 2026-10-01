@@ -121,9 +121,13 @@ void TestDataPaths() {
     Check(paths::Join("sdmc:/JiaoZiPi", "/abs") == "/abs", "Join：child 为绝对路径时覆盖");
     Check(paths::ParentDirectory("sdmc:/JiaoZiPi/logs") == "sdmc:/JiaoZiPi", "ParentDirectory");
     Check(paths::FileName("a/b/c.txt") == "c.txt", "FileName");
-    Check(paths::IsAbsolute("/x") && paths::IsAbsolute("C:/x") && paths::IsAbsolute("sdmc:/x") &&
+    Check(paths::IsAbsolute("sdmc:/x") && paths::IsAbsolute("C:/x") && paths::IsAbsolute("/x") &&
               !paths::IsAbsolute("x/y"),
           "IsAbsolute");
+    Check(paths::NormalizeKey("GBA") == "gba", "NormalizeKey：ASCII 转小写");
+    Check(paths::NormalizeKey("Pokemon FireRed/Leaf") == "pokemon_firered_leaf",
+          "NormalizeKey：非法字符换成 _ 并压缩");
+    Check(paths::NormalizeKey("..") == "unknown", "NormalizeKey：结果为空时回退 unknown");
 
     const std::string root = "tests/tmp_utils_test/JiaoZiPi";
     Check(paths::MakeDirectories(root + "/config/deep"), "递归创建多级目录");
@@ -133,20 +137,48 @@ void TestDataPaths() {
     paths::DataRoot& dataRoot = paths::DataRoot::Default();
     dataRoot.Clear();
     Check(!dataRoot.IsSet() && dataRoot.Get().empty(), "默认未设置数据根目录");
-    Check(!dataRoot.EnsureLayout() && !dataRoot.LastError().empty(), "未设置时创建失败并记录原因");
+    Check(!dataRoot.EnsureStartupLayout() && !dataRoot.LastError().empty(),
+          "未设置时创建失败并记录原因");
 
     paths::SetDataRoot(root + "/");  // 顺带验证规范化
     Check(paths::DataRootPath() == root, "设置数据根目录（自动规范化）");
-    Check(paths::DataPath("logs") == root + "/logs", "DataPath 拼接");
-    Check(paths::EnsureDataDirectories(), "按规范创建全部子目录");
+    Check(paths::EnsureDataDirectories(), "首次启动创建 root + config");
+    Check(paths::DirectoryExists(paths::DataPath(paths::sub::kConfig)) &&
+              !paths::DirectoryExists(paths::DataPath(paths::sub::kData)),
+          "其余目录懒创建（data 尚未出现）");
 
-    bool allCreated = true;
-    for (const char* name : paths::kSubDirectories) {
+    Check(paths::FrontendConfigPath() == root + "/config/frontend.json", "前端设置路径");
+    Check(paths::PlatformConfigPath("GBA") == root + "/config/platforms/gba.json",
+          "机种全局配置路径（platforms/）");
+    Check(paths::CoreConfigPath("mgba") == root + "/config/cores/mgba.json", "核心配置路径");
+    Check(paths::GameConfigPath("GBA", "Pokemon FireRed") ==
+              root + "/config/games/gba/pokemon_firered.json",
+          "每游戏独立配置路径");
+    Check(paths::SaveFilePath("gba", "Pokemon FireRed") ==
+              root + "/data/saves/gba/pokemon_firered.sav",
+          "电池存档路径");
+    Check(paths::StateFilePath("gba", "pokemon", 3) == root + "/data/states/gba/pokemon.st3",
+          "即时存档路径（带槽位）");
+    Check(paths::NandDirectory("n3ds") == root + "/data/nand/n3ds", "虚拟 NAND 目录");
+    Check(paths::BiosDirectory("ps1") == root + "/system/bios/ps1", "BIOS/固件目录");
+    Check(paths::DatabaseDirectory() == root + "/system/database", "游戏数据库目录");
+    Check(paths::ThemeDirectory("cream") == root + "/media/themes/cream", "主题目录");
+    Check(paths::ShaderDirectory(paths::shader::kVulkan) == root + "/media/shaders/vulkan" &&
+              paths::ShaderDirectory(paths::shader::kOpenGl) == root + "/media/shaders/opengl",
+          "着色器按后端分目录（vulkan / opengl）");
+    Check(paths::OverlayDirectory() == root + "/media/overlays", "遮罩目录");
+    Check(paths::ThumbnailDirectory("gba") == root + "/media/thumbnails/gba", "缩略图目录");
+    Check(paths::CoreFilePath("mgba", ".nro") == root + "/cores/mgba.nro", "核心文件路径");
+    Check(paths::CacheDirectory("shader") == root + "/cache/shader", "缓存目录");
+
+    Check(paths::EnsureAllDirectories(), "预创建全部顶层目录");
+    bool allRoots = true;
+    for (const char* name : paths::kRootDirectories) {
         if (!paths::DirectoryExists(paths::DataPath(name))) {
-            allCreated = false;
+            allRoots = false;
         }
     }
-    Check(allCreated, "规范里的 10 个子目录都已创建");
+    Check(allRoots, "6 个顶层目录（config/data/system/media/cores/cache）都已创建");
 
     char arg0[] = "app";
     char arg1[] = "--data-dir";
@@ -167,7 +199,7 @@ void TestDataPaths() {
           "覆盖：回退到环境变量");
 
     REMOVE_DIR((root + "/config/deep").c_str());
-    for (const char* name : paths::kSubDirectories) {
+    for (const char* name : paths::kRootDirectories) {
         REMOVE_DIR(paths::DataPath(name).c_str());
     }
     REMOVE_DIR(root.c_str());

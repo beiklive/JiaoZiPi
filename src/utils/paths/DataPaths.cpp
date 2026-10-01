@@ -152,6 +152,33 @@ std::string FileName(std::string_view path) {
     return slash == std::string::npos ? normalized : normalized.substr(slash + 1);
 }
 
+std::string NormalizeKey(std::string_view text) {
+    std::string out;
+    out.reserve(text.size());
+    for (const char raw : text) {
+        char ch = raw;
+        if (ch >= 'A' && ch <= 'Z') {
+            ch = static_cast<char>(ch - 'A' + 'a');
+        }
+        const bool keep = (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '_' ||
+                          ch == '-' || ch == '.';
+        if (!keep) {
+            ch = '_';
+        }
+        if (ch == '_' && !out.empty() && out.back() == '_') {
+            continue;  // 压缩连续下划线
+        }
+        out.push_back(ch);
+    }
+    while (!out.empty() && out.front() == '.') {
+        out.erase(out.begin());  // 防止隐藏文件与 ".." 上跳
+    }
+    while (!out.empty() && (out.back() == '_' || out.back() == '.')) {
+        out.pop_back();
+    }
+    return out.empty() ? std::string("unknown") : out;
+}
+
 bool DirectoryExists(std::string_view path) {
     const std::string normalized = Normalize(path);
     return !normalized.empty() && StatIsDirectory(normalized);
@@ -260,16 +287,22 @@ bool DataRoot::Ensure(std::string_view name) const {
     return false;
 }
 
-bool DataRoot::EnsureLayout() const {
-    if (!Ensure()) {
-        return false;
-    }
-    for (const char* name : kSubDirectories) {
+bool DataRoot::EnsureStartupLayout() const {
+    for (const char* name : kStartupDirectories) {
         if (!Ensure(name)) {
             return false;
         }
     }
-    return true;
+    return Ensure();
+}
+
+bool DataRoot::EnsureLayout() const {
+    for (const char* name : kRootDirectories) {
+        if (!Ensure(name)) {
+            return false;
+        }
+    }
+    return Ensure();
 }
 
 std::string DataRoot::LastError() const {
@@ -283,7 +316,77 @@ std::string DataRootPath() { return DataRoot::Default().Get(); }
 
 std::string DataPath(std::string_view relative) { return DataRoot::Default().Sub(relative); }
 
-bool EnsureDataDirectories() { return DataRoot::Default().EnsureLayout(); }
+bool EnsureDataDirectories() { return DataRoot::Default().EnsureStartupLayout(); }
+
+bool EnsureAllDirectories() { return DataRoot::Default().EnsureLayout(); }
+
+// ---------------------------------------------------------------------------
+// 常用路径
+// ---------------------------------------------------------------------------
+std::string FrontendConfigPath() {
+    return Join(DataPath(sub::kConfig), sub::kFrontendConfig);
+}
+
+std::string PlatformConfigPath(std::string_view platform) {
+    return Join(Join(DataPath(sub::kConfig), sub::kPlatforms),
+                NormalizeKey(platform) + ".json");
+}
+
+std::string CoreConfigPath(std::string_view core) {
+    return Join(Join(DataPath(sub::kConfig), sub::kCores), NormalizeKey(core) + ".json");
+}
+
+std::string GameConfigPath(std::string_view platform, std::string_view gameId) {
+    return Join(Join(Join(DataPath(sub::kConfig), sub::kGames), NormalizeKey(platform)),
+                NormalizeKey(gameId) + ".json");
+}
+
+std::string SaveFilePath(std::string_view platform, std::string_view gameId,
+                         std::string_view extension) {
+    return Join(Join(Join(DataPath(sub::kData), sub::kSaves), NormalizeKey(platform)),
+                NormalizeKey(gameId) + std::string(extension));
+}
+
+std::string StateFilePath(std::string_view platform, std::string_view gameId, int slot,
+                          std::string_view extension) {
+    return Join(Join(Join(DataPath(sub::kData), sub::kStates), NormalizeKey(platform)),
+                NormalizeKey(gameId) + std::string(extension) + std::to_string(slot));
+}
+
+std::string NandDirectory(std::string_view platform) {
+    return Join(Join(DataPath(sub::kData), sub::kNand), NormalizeKey(platform));
+}
+
+std::string BiosDirectory(std::string_view platform) {
+    return Join(Join(DataPath(sub::kSystem), sub::kBios), NormalizeKey(platform));
+}
+
+std::string DatabaseDirectory() { return Join(DataPath(sub::kSystem), sub::kDatabase); }
+
+std::string ThemeDirectory(std::string_view theme) {
+    const std::string base = Join(DataPath(sub::kMedia), sub::kThemes);
+    return theme.empty() ? base : Join(base, NormalizeKey(theme));
+}
+
+std::string ShaderDirectory(std::string_view backend) {
+    const std::string base = Join(DataPath(sub::kMedia), sub::kShaders);
+    return backend.empty() ? base : Join(base, NormalizeKey(backend));
+}
+
+std::string OverlayDirectory() { return Join(DataPath(sub::kMedia), sub::kOverlays); }
+
+std::string ThumbnailDirectory(std::string_view platform) {
+    return Join(Join(DataPath(sub::kMedia), sub::kThumbnails), NormalizeKey(platform));
+}
+
+std::string CoreFilePath(std::string_view core, std::string_view extension) {
+    return Join(DataPath(sub::kCores), NormalizeKey(core) + std::string(extension));
+}
+
+std::string CacheDirectory(std::string_view name) {
+    const std::string base = DataPath(sub::kCache);
+    return name.empty() ? base : Join(base, NormalizeKey(name));
+}
 
 std::string DataRootFromEnvironment(const char* environmentVariable) {
     if (environmentVariable == nullptr || environmentVariable[0] == '\0') {
