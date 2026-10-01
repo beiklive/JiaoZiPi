@@ -55,6 +55,7 @@ int main(int argc, char** argv) {
         glfwTerminate();
         return 1;
     }
+    glfwMaximizeWindow(window);
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1);
 
@@ -92,7 +93,14 @@ int main(int argc, char** argv) {
             ImGui::EndMainMenuBar();
         }
 
-        ImGui::Begin("JiaoZiPi");
+        const ImGuiViewport* mainViewport = ImGui::GetMainViewport();
+        ImGui::SetNextWindowPos(mainViewport->WorkPos);
+        ImGui::SetNextWindowSize(mainViewport->WorkSize);
+        constexpr ImGuiWindowFlags fullWindowFlags =
+            ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
+            ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+            ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+        ImGui::Begin("JiaoZiPi", nullptr, fullWindowFlags);
         ImGui::TextUnformatted("JiaoZiPi 多核心模拟器前端");
         ImGui::Text("主题字体: %s", fontsLoaded ? "switch_font.ttf" : "系统回退字体");
         ImGui::Separator();
