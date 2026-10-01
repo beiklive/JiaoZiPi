@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "projectId": "jiaozi_pi_default",
+  "name": "JiaoZiPi Default Theme",
+  "target": {"frontend": "JiaoZiPi"},
+  "theme": "theme.json",
+  "manifest": "manifest.snapshot.json"
+}

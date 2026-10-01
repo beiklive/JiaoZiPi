@@ -127,6 +127,24 @@ sh tools/build_utils_test.sh
 - [ ] 实现遮罩与滤镜
 - [ ] 持续扩充支持的核心
 
+## Baojiaozi 主题运行时
+
+JiaoZiPi 通过 `third_party/baojiaozi` 引入 Baojiaozi。当前顶层 CMake 会构建 Baojiaozi 的核心文档解析器、运行时、ImGui 渲染器以及 JiaoZiPi 的最小桌面窗口。
+
+```bash
+git submodule update --init --recursive
+cmake -S . -B build/phase4 -DJIAOZIPI_BUILD_APP=ON
+cmake --build build/phase4 -j4
+```
+
+启动时默认读取 `resources/themes/default_theme`，也可以指定主题目录：
+
+```bash
+build/phase4/jiaozi_pi_app --theme-dir /path/to/theme
+```
+
+当前主题子模块使用本地工作区 URL，因为 Baojiaozi 尚未发布到远程 Git 仓库。发布远程仓库后，需要将 `.gitmodules` 中的 URL 替换为正式地址。
+
 ## 反馈与贡献
 
 欢迎通过 Issue 反馈问题、提交核心适配建议或功能需求。

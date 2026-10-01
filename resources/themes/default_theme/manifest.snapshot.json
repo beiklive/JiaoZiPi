@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "application": "JiaoZiPi",
+  "pages": [
+    {"id": "home", "title": "主页"},
+    {"id": "library", "title": "游戏库"},
+    {"id": "settings", "title": "设置"}
+  ],
+  "actions": [
+    {"id": "navigate.page", "parameters": {"pageId": "string"}}
+  ],
+  "states": []
+}

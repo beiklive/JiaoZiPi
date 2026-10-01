@@ -1,0 +1,26 @@
+{
+  "tokens": {
+    "color.background": "#15171B",
+    "color.surface": "#22262D",
+    "color.primary": "#4A90E2",
+    "color.text": "#F5F7FA",
+    "color.muted": "#9AA4B2",
+    "spacing.medium": 16
+  },
+  "styles": {
+    "button.primary": {
+      "background": "$color.primary",
+      "textColor": "$color.text",
+      "cornerRadius": 6,
+      "padding": 6
+    },
+    "text.title": {
+      "textColor": "$color.text",
+      "fontSize": 32
+    },
+    "text.subtitle": {
+      "textColor": "$color.muted",
+      "fontSize": 18
+    }
+  }
+}
