@@ -173,6 +173,8 @@ void TestDataPaths() {
     Check(paths::ThumbnailDirectory("gba") == root + "/media/thumbnails/gba", "缩略图目录");
     Check(paths::CoreFilePath("mgba", ".nro") == root + "/cores/mgba.nro", "核心文件路径");
     Check(paths::CacheDirectory("shader") == root + "/cache/shader", "缓存目录");
+    Check(paths::PlaylistDirectory() == root + "/playlists", "游戏列表目录");
+    Check(paths::PlaylistPath("GBA") == root + "/playlists/gba.json", "游戏列表文件路径");
 
     // 机种目录名（3DS 用 "3ds"，不是 n3ds）
     Check(std::string(jzp::MachineKey(jzp::Machine::N3DS)) == "3ds", "MachineKey(3DS) == \"3ds\"");
@@ -222,7 +224,7 @@ void TestDataPaths() {
             allRoots = false;
         }
     }
-    Check(allRoots, "6 个顶层目录（config/data/system/media/cores/cache）都已创建");
+    Check(allRoots, "7 个顶层目录（config/data/system/media/cores/cache/playlists）都已创建");
 
     char arg0[] = "app";
     char arg1[] = "--data-dir";

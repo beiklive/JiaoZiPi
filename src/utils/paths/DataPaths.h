@@ -9,6 +9,7 @@
 //   <root>/media/{themes/, shaders/<后端>/, overlays/, thumbnails/, fonts/, icons/}
 //   <root>/cores/
 //   <root>/cache/
+//   <root>/playlists/            游戏列表（playlists/<机种或分类>.json）
 //
 // 注意命名：数据目录里的 platforms 指**机种**（gba / ps1 / 3ds ...），
 // 与 src/platform/ 的宿主平台（Switch / Windows / Android ...）不是一回事。
@@ -42,6 +43,7 @@ constexpr const char* kSystem = "system";
 constexpr const char* kMedia = "media";
 constexpr const char* kCores = "cores";
 constexpr const char* kCache = "cache";
+constexpr const char* kPlaylists = "playlists";  // 游戏列表（类似 RetroArch playlists/）
 
 // 二级目录
 constexpr const char* kPlatforms = "platforms";  // config/platforms —— 机种全局配置
@@ -72,8 +74,9 @@ constexpr const char* kAppDirectoryName = "JiaoZiPi";
 // 首次启动创建的目录（最小集）
 inline constexpr const char* kStartupDirectories[] = {sub::kConfig};
 // 全部顶层目录（需要预创建时用 EnsureAllDirectories()）
-inline constexpr const char* kRootDirectories[] = {sub::kConfig, sub::kData,  sub::kSystem,
-                                                  sub::kMedia,  sub::kCores, sub::kCache};
+inline constexpr const char* kRootDirectories[] = {sub::kConfig, sub::kData,     sub::kSystem,
+                                                  sub::kMedia,  sub::kCores,    sub::kCache,
+                                                  sub::kPlaylists};
 
 // ---------------------------------------------------------------------------
 // 纯字符串处理（不做文件系统访问）
@@ -160,6 +163,8 @@ std::string ShaderDirectory(std::string_view backend = shader::kVulkan);       /
 std::string OverlayDirectory();                                                // media/overlays
 std::string ThumbnailDirectory(std::string_view platform);                     // media/thumbnails/<platform>
 std::string CoreFilePath(std::string_view core, std::string_view extension = std::string_view());
+std::string PlaylistDirectory();                                               // playlists
+std::string PlaylistPath(std::string_view name);                               // playlists/<name>.json
 std::string CacheDirectory(std::string_view name = std::string_view());        // cache[/<name>]
 
 // ---------------------------------------------------------------------------

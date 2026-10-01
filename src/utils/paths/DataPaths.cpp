@@ -402,6 +402,12 @@ std::string CacheDirectory(std::string_view name) {
     return name.empty() ? base : Join(base, NormalizeKey(name));
 }
 
+std::string PlaylistDirectory() { return DataPath(sub::kPlaylists); }
+
+std::string PlaylistPath(std::string_view name) {
+    return Join(DataPath(sub::kPlaylists), NormalizeKey(name) + ".json");
+}
+
 // ---------------------------------------------------------------------------
 // 可执行文件位置
 // ---------------------------------------------------------------------------

@@ -21,9 +21,10 @@
 <root>/media/{themes/, shaders/<后端>/, overlays/, thumbnails/, fonts/, icons/}
 <root>/cores/
 <root>/cache/
+<root>/playlists/          playlists/<机种或分类>.json
 ```
 
-首次启动只创建 `config/`，其余按需懒创建（`EnsureDataDirectories()` vs `EnsureAllDirectories()`）。
+首次启动只创建 `config/`，其余按需懒创建（`EnsureDataDirectories()` 建 1 个，`EnsureAllDirectories()` 建全部 7 个顶层目录）。
 
 `platforms/` 指**机种**（gba / ps1 / 3ds），与 `src/platform/` 的宿主平台（Switch / Windows）不是一回事。
 
@@ -57,6 +58,7 @@ int main(int argc, char** argv) {
     std::string bios    = paths::BiosDirectory("ps1");                        // system/bios/ps1
     std::string shader  = paths::ShaderDirectory(paths::shader::kVulkan);     // media/shaders/vulkan
     std::string core    = paths::CoreFilePath("mgba", ".nro");                // cores/mgba.nro
+    std::string list    = paths::PlaylistPath("gba");                         // playlists/gba.json
 }
 ```
 
@@ -68,10 +70,10 @@ int main(int argc, char** argv) {
 | 创建目录 | `EnsureDataDirectories()`（root + config）、`EnsureAllDirectories()`（6 个顶层）、`DataRoot::Ensure(name)`、`EnsureStartupLayout()`、`EnsureLayout()` |
 | 路径拼接 | `Join`、`Normalize`、`ParentDirectory`、`FileName`、`IsAbsolute`、`NormalizeKey` |
 | 可执行文件 | `ExecutablePath(argc, argv)`、`ExecutableDirectory(argc, argv)`、`DefaultDataRoot(argc, argv)`、`DefaultResourceRoot(argc, argv)`、`kAppDirectoryName` |
-| 常用路径 | `FrontendConfigPath`、`PlatformConfigPath`、`CoreConfigPath`、`GameConfigPath`、`SaveFilePath`、`StateFilePath`、`NandDirectory`、`BiosDirectory`、`DatabaseDirectory`、`ThemeDirectory`、`ShaderDirectory`、`OverlayDirectory`、`ThumbnailDirectory`、`CoreFilePath`、`CacheDirectory` |
+| 常用路径 | `FrontendConfigPath`、`PlatformConfigPath`、`CoreConfigPath`、`GameConfigPath`、`SaveFilePath`、`StateFilePath`、`NandDirectory`、`BiosDirectory`、`DatabaseDirectory`、`ThemeDirectory`、`ShaderDirectory`、`OverlayDirectory`、`ThumbnailDirectory`、`CoreFilePath`、`CacheDirectory`、`PlaylistDirectory`、`PlaylistPath` |
 | 文件系统 | `MakeDirectories`、`DirectoryExists`、`FileExists`、`IsWritableDirectory` |
 | 覆盖解析 | `ResolveDataRootOverride(argc, argv, env)`、`DataRootFromEnvironment()` |
-| 常量 | `kStartupDirectories`、`kRootDirectories`、`sub::kConfig/kData/kSystem/kMedia/kCores/kCache`、`sub::kPlatforms/kGames/kSaves/kStates/kNand/kBios/kDatabase/kThemes/kShaders/kOverlays/kThumbnails/kFonts/kIcons`、`shader::kVulkan/kOpenGl`、`kStartupDirectories`、`kRootDirectories` |
+| 常量 | `kStartupDirectories`、`kRootDirectories`、`sub::kConfig/kData/kSystem/kMedia/kCores/kCache`、`sub::kPlatforms/kGames/kSaves/kStates/kNand/kBios/kDatabase/kThemes/kShaders/kOverlays/kThumbnails/kFonts/kIcons/kPlaylists`、`shader::kVulkan/kOpenGl`、`kStartupDirectories`、`kRootDirectories` |
 
 - `NormalizeKey()`：`"GBA"` → `gba`，`"Pokemon FireRed/Leaf"` → `pokemon_firered_leaf`，空结果 → `unknown`；
   机种目录名请直接用 `jzp::MachineKey(machine)`（3DS 是 `3ds`）

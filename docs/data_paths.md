@@ -19,7 +19,7 @@ JiaoZiPi 的可写数据（配置、存档、日志、缓存、用户素材）�
 
 ## 目录布局
 
-顶层只有 6 个目录，其余全部下沉：
+顶层只有 7 个目录，其余全部下沉：
 
 ```text
 <数据根>/JiaoZiPi/
@@ -44,10 +44,26 @@ JiaoZiPi 的可写数据（配置、存档、日志、缓存、用户素材）�
 │   ├── fonts/
 │   └── icons/
 ├── cores/                                核心文件（mgba.nro、ppsspp.nro…）
-└── cache/                                可重建（shader cache、索引、封面缓存）
+├── cache/                                可重建（shader cache、索引、封面缓存）
+└── playlists/                            游戏列表（playlists/<机种或分类>.json）
 ```
 
 **按需创建**：首次启动只建 `config/`，其余目录在真正写入时才创建，根目录始终保持干净。
+
+`playlists/` 与 RetroArch 的 `playlists/` 同义：一个列表一个 JSON 文件，按机种或自定义分类组织。字段沿用 RA 的关键字段（`path` / `label` / `crc32`）：
+
+```json
+{
+  "name": "Game Boy Advance",
+  "machine": "gba",
+  "default_core": "mgba",
+  "items": [
+    { "path": "sdmc:/roms/gba/Pokemon.gpr", "label": "Pokemon FireRed", "game_id": "bpre", "crc32": "1a2b3c4d" }
+  ]
+}
+```
+
+`items[].game_id` 就是前面说的稳定游戏 ID，`config/games/<机种>/<game-id>.json` 与 `data/saves/<机种>/<game-id>.sav` 都以它命名。
 
 | 内容 | 位置 |
 | --- | --- |
@@ -65,6 +81,7 @@ JiaoZiPi 的可写数据（配置、存档、日志、缓存、用户素材）�
 | 遮罩 | `media/overlays/` |
 | 缩略图 | `media/thumbnails/<机种>/` |
 | 核心文件 | `cores/<核心>.<扩展名>` |
+| 游戏列表 | `playlists/<机种或分类>.json` |
 | 缓存 | `cache/<用途>/` |
 | 日志 | `logs/`（写入时才创建；见下） |
 
