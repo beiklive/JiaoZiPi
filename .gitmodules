@@ -12,4 +12,4 @@
 	url = https://github.com/libarchive/libarchive
 [submodule "third_party/baojiaozi"]
 	path = third_party/baojiaozi
-	url = file:///Users/beiklive/Code/C++/developing/JiaoZi_dev/Baojiaozi
+	url = git@github.com:beiklive/Baojiaozi.git
