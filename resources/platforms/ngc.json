@@ -1,0 +1,14 @@
+{
+  "machine": "ngc",
+  "name": "Nintendo GameCube",
+  "core": "dolphin",
+  "extensions": [
+    ".iso",
+    ".gcm",
+    ".rvz",
+    ".ciso",
+    ".wia",
+    ".zip",
+    ".7z"
+  ]
+}

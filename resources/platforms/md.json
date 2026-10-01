@@ -1,0 +1,13 @@
+{
+  "machine": "md",
+  "name": "Mega Drive / Genesis",
+  "core": "genesis_plus_gx",
+  "extensions": [
+    ".md",
+    ".gen",
+    ".bin",
+    ".smd",
+    ".zip",
+    ".7z"
+  ]
+}

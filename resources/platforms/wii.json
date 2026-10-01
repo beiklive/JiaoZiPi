@@ -1,0 +1,14 @@
+{
+  "machine": "wii",
+  "name": "Nintendo Wii",
+  "core": "dolphin",
+  "extensions": [
+    ".iso",
+    ".wbfs",
+    ".rvz",
+    ".ciso",
+    ".wia",
+    ".zip",
+    ".7z"
+  ]
+}

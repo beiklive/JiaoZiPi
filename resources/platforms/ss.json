@@ -1,0 +1,15 @@
+{
+  "machine": "ss",
+  "name": "Sega Saturn",
+  "core": "yabasanshiro",
+  "extensions": [
+    ".cue",
+    ".bin",
+    ".iso",
+    ".chd",
+    ".mds",
+    ".ccd",
+    ".zip",
+    ".7z"
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "machine": "3ds",
+  "name": "Nintendo 3DS",
+  "core": "azahar",
+  "extensions": [
+    ".3ds",
+    ".cci",
+    ".cxi",
+    ".cia",
+    ".zip",
+    ".7z"
+  ]
+}

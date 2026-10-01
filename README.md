@@ -64,7 +64,8 @@ JiaoZiPi/
 │       ├── format/         # 字符串格式化（header-only，供上面两个模块共用）
 │       ├── paths/          # 数据根目录管理（设置路径 / 建目录 / 覆盖解析）
 │       └── JiaoZiPiMachine.h  # 机种枚举与徽标配色
-├── resources/              # 资源目录
+├── resources/              # 资源目录（只读，随包发布）
+│   ├── platforms/          # 各机种内置配置（机种名 / 默认核心 / 后缀）
 │   ├── fonts/              # 字体
 │   ├── icons/              # 图标
 │   ├── images/             # 图片
@@ -76,7 +77,9 @@ JiaoZiPi/
 │   └── themes/             # 主题
 ├── third_party/            # 第三方库（子模块）与模拟器核心
 │   ├── spdlog/             # 日志底层（v1.17.0，header-only 使用）
-│   └── json/               # 语言表解析 nlohmann/json（v3.12.0，header-only 使用）
+│   ├── json/               # JSON 解析 nlohmann/json（v3.12.0，header-only 使用）
+│   ├── miniz/              # zip 解压（3.1.2，纯 C）
+│   └── libarchive/         # 7z 解压（v3.8.9，BSD-2）
 ├── docs/                   # 文档
 ├── tools/                  # 辅助脚本与工具
 ├── tests/                  # 测试
@@ -99,7 +102,8 @@ JiaoZiPi/
 - 多语言：单个 [language.json](resources/lang/language.json) 管所有语言（`key → { 语言: 文本 }`），查找链「当前语言 → 同语言族 → 回退语言 → key」，用法见 [i18n/README.md](src/utils/i18n/README.md)
 - 数据目录：设置/拼接数据根路径、递归建目录、可写探测，支持 `--data-dir` 与环境变量覆盖，规范见 [docs/data_paths.md](docs/data_paths.md)，用法见 [paths/README.md](src/utils/paths/README.md)
 
-两者对第三方库只做 header-only 依赖（spdlog / nlohmann-json），首次克隆后先拉取子模块：
+日志与多语言对第三方库只做 header-only 依赖（spdlog / nlohmann-json）；zip / 7z 解压用 miniz + libarchive。
+首次克隆后先拉取子模块：
 
 ```bash
 git submodule update --init --recursive

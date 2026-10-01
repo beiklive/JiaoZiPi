@@ -1,0 +1,13 @@
+{
+  "machine": "psp",
+  "name": "PlayStation Portable",
+  "core": "ppsspp",
+  "extensions": [
+    ".iso",
+    ".cso",
+    ".chd",
+    ".pbp",
+    ".zip",
+    ".7z"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "machine": "arcade",
+  "name": "Arcade",
+  "core": "fbneo",
+  "extensions": [
+    ".zip",
+    ".7z",
+    ".chd"
+  ]
+}

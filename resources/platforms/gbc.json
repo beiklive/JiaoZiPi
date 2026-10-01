@@ -1,0 +1,11 @@
+{
+  "machine": "gbc",
+  "name": "Game Boy Color",
+  "core": "gambatte",
+  "extensions": [
+    ".gbc",
+    ".gb",
+    ".zip",
+    ".7z"
+  ]
+}

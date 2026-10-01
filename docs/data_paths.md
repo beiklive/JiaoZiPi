@@ -79,10 +79,10 @@ JiaoZiPi 的可写数据（配置、存档、日志、缓存、用户素材）�
 
 | 类型 | 位置 | 说明 |
 | --- | --- | --- |
-| 内置资源（字体、图标、内置 `language.json`、内置滤镜/遮罩/主题、随包数据库） | 打包内 `resources/`：Switch `romfs:/`、Android `assets/`、iOS/macOS app bundle、Windows/Linux 可执行文件旁 | **只读**，永不写入 |
+| 内置资源（字体、图标、内置 `language.json`、各机种配置 `platforms/<机种>.json`、内置滤镜/遮罩/主题、随包数据库） | 打包内 `resources/`：Switch `romfs:/`、Android `assets/`、iOS/macOS app bundle、Windows/Linux 可执行文件旁 | **只读**，永不写入 |
 | 用户数据与覆盖（上表 `config/` `data/` `system/` `media/` `cores/` `cache/`） | 数据根目录 | 读写 |
 
-加载顺序统一为：**数据根目录 → 内置资源**（前者存在就用前者）。例如 `media/themes/` 有同名主题就覆盖内置主题，`system/database/` 有更新版数据库就用它。
+加载顺序统一为：**数据根目录 → 内置资源**（前者存在就用前者）。例如 `config/platforms/<机种>.json` 覆盖内置的 `resources/platforms/<机种>.json`，`media/themes/` 有同名主题就覆盖内置主题，`system/database/` 有更新版数据库就用它。
 
 ## 平台差异与风险
 

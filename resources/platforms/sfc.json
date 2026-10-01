@@ -1,0 +1,14 @@
+{
+  "machine": "sfc",
+  "name": "Super Famicom / SNES",
+  "core": "snes9x",
+  "extensions": [
+    ".sfc",
+    ".smc",
+    ".swc",
+    ".fig",
+    ".bs",
+    ".zip",
+    ".7z"
+  ]
+}

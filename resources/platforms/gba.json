@@ -1,0 +1,11 @@
+{
+  "machine": "gba",
+  "name": "Game Boy Advance",
+  "core": "mgba",
+  "extensions": [
+    ".gba",
+    ".agb",
+    ".zip",
+    ".7z"
+  ]
+}

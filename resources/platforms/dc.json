@@ -1,0 +1,16 @@
+{
+  "machine": "dc",
+  "name": "Dreamcast",
+  "core": "flycast",
+  "extensions": [
+    ".gdi",
+    ".cdi",
+    ".cue",
+    ".bin",
+    ".chd",
+    ".iso",
+    ".mds",
+    ".zip",
+    ".7z"
+  ]
+}

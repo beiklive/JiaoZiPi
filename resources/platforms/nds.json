@@ -1,0 +1,11 @@
+{
+  "machine": "nds",
+  "name": "Nintendo DS",
+  "core": "melonds",
+  "extensions": [
+    ".nds",
+    ".dsi",
+    ".zip",
+    ".7z"
+  ]
+}

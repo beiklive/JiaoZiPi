@@ -13,6 +13,8 @@
 
 #include "i18n/I18n.h"
 #include "log/Logger.h"
+#include <nlohmann/json.hpp>
+
 #include "JiaoZiPiMachine.h"
 #include "paths/DataPaths.h"
 
@@ -247,6 +249,87 @@ void TestDataPaths() {
     REMOVE_DIR(root.c_str());
 }
 
+// 各机种内置配置（resources/platforms/*.json）
+void TestPlatformConfigs() {
+    std::printf("[platforms]\n");
+
+    int files = 0;
+    bool matchesHeader = true;
+    bool extensionsValid = true;
+    bool archivesListed = true;
+
+    for (const jzp::Machine machine : jzp::kAllMachines) {
+        const std::string key = jzp::MachineKey(machine);
+        const std::string path = "resources/platforms/" + key + ".json";
+        std::FILE* file = std::fopen(path.c_str(), "rb");
+        if (file == nullptr) {
+            matchesHeader = false;
+            continue;
+        }
+        std::string text;
+        char buffer[4096];
+        std::size_t read = 0;
+        while ((read = std::fread(buffer, 1, sizeof(buffer), file)) > 0) {
+            text.append(buffer, read);
+        }
+        std::fclose(file);
+        ++files;
+
+        const nlohmann::json doc = nlohmann::json::parse(text, nullptr, false);
+        if (doc.is_discarded() || !doc.is_object()) {
+            matchesHeader = false;
+            continue;
+        }
+        if (doc.value("machine", std::string()) != key ||
+            doc.value("name", std::string()) != jzp::MachineName(machine) ||
+            doc.value("core", std::string()).empty()) {
+            matchesHeader = false;
+        }
+
+        if (!doc.contains("extensions") || !doc["extensions"].is_array() ||
+            doc["extensions"].empty()) {
+            extensionsValid = false;
+            continue;
+        }
+        std::vector<std::string> list;
+        for (const auto& item : doc["extensions"]) {
+            if (!item.is_string()) {
+                extensionsValid = false;
+                continue;
+            }
+            const std::string extension = item.get<std::string>();
+            if (extension.size() < 2 || extension.front() != '.') {
+                extensionsValid = false;
+            }
+            for (const char ch : extension) {
+                if (!((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '.')) {
+                    extensionsValid = false;  // 必须是小写点开头
+                }
+            }
+            for (const std::string& existing : list) {
+                if (existing == extension) {
+                    extensionsValid = false;  // 重复后缀
+                }
+            }
+            list.push_back(extension);
+        }
+        bool hasZip = false;
+        bool has7z = false;
+        for (const std::string& extension : list) {
+            hasZip = hasZip || extension == ".zip";
+            has7z = has7z || extension == ".7z";
+        }
+        if (!hasZip || !has7z) {
+            archivesListed = false;
+        }
+    }
+
+    Check(files == 15, "找到 15 个机种配置文件");
+    Check(matchesHeader, "machine / name / core 与 JiaoZiPiMachine.h 一致");
+    Check(extensionsValid, "后缀列表合法（小写、点开头、无重复）");
+    Check(archivesListed, "每个机种都列出了 .zip 与 .7z");
+}
+
 void TestLogger() {
     std::printf("[log]\n");
     MAKE_DIR("tests/tmp_utils_test");
@@ -353,6 +436,7 @@ void TestLogger() {
 int main() {
     TestI18n();
     TestDataPaths();
+    TestPlatformConfigs();
     TestLogger();
     std::printf("\n%s（失败 %d 项）\n", g_failures == 0 ? "ALL PASS" : "FAILED", g_failures);
     return g_failures == 0 ? 0 : 1;

@@ -4,6 +4,7 @@
 
 | 目录 | 内容 |
 | --- | --- |
+| [platforms/](platforms/README.md) | 各机种内置配置（机种名 / 默认核心 / 支持的后缀） |
 | [fonts/](fonts/README.md) | 字体 |
 | [icons/](icons/README.md) | 图标、机种徽标 |
 | [images/](images/README.md) | 图片、背景、Logo |

@@ -1,0 +1,10 @@
+{
+  "machine": "gb",
+  "name": "Game Boy",
+  "core": "gambatte",
+  "extensions": [
+    ".gb",
+    ".zip",
+    ".7z"
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "machine": "fc",
+  "name": "Famicom / NES",
+  "core": "fceumm",
+  "extensions": [
+    ".nes",
+    ".fds",
+    ".unf",
+    ".unif",
+    ".zip",
+    ".7z"
+  ]
+}

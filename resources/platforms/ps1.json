@@ -1,0 +1,16 @@
+{
+  "machine": "ps1",
+  "name": "PlayStation",
+  "core": "duckstation",
+  "extensions": [
+    ".cue",
+    ".bin",
+    ".iso",
+    ".img",
+    ".chd",
+    ".pbp",
+    ".ccd",
+    ".zip",
+    ".7z"
+  ]
+}
