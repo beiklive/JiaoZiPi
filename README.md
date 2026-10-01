@@ -127,3 +127,13 @@ sh tools/build_utils_test.sh
 ## 反馈与贡献
 
 欢迎通过 Issue 反馈问题、提交核心适配建议或功能需求。
+
+## 许可证
+
+本项目以 **MIT** 许可证发布，见 [LICENSE](LICENSE)。
+
+第三方库（子模块）遵循各自上游许可证：spdlog / nlohmann-json / miniz 为 MIT，libarchive 为 BSD-2-Clause，明细见 [third_party/README.md](third_party/README.md)。
+
+模拟器核心是独立项目，各自遵循上游许可证；随包分发时必须一并保留其许可证文件。
+
+> 注意：核心以独立模块（`.nro` / `.so` / `.dll`）方式加载时，本项目可维持 MIT；若改为静态链接 GPL 系核心（Dolphin、PPSSPP、YabaSanshiro 等），本项目需相应改为 GPL 兼容许可证。
