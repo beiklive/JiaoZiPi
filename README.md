@@ -143,7 +143,7 @@ cmake --build build/phase4 -j4
 build/phase4/jiaozi_pi_app --theme-dir /path/to/theme
 ```
 
-当前主题子模块使用本地工作区 URL，因为 Baojiaozi 尚未发布到远程 Git 仓库。发布远程仓库后，需要将 `.gitmodules` 中的 URL 替换为正式地址。
+Baojiaozi 子模块使用正式远程地址 `git@github.com:beiklive/Baojiaozi.git`。
 
 ## 反馈与贡献
 
