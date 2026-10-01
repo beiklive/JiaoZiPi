@@ -13,6 +13,7 @@
 
 #include "i18n/I18n.h"
 #include "log/Logger.h"
+#include "JiaoZiPiMachine.h"
 #include "paths/DataPaths.h"
 
 #if defined(_WIN32)
@@ -159,7 +160,7 @@ void TestDataPaths() {
           "电池存档路径");
     Check(paths::StateFilePath("gba", "pokemon", 3) == root + "/data/states/gba/pokemon.st3",
           "即时存档路径（带槽位）");
-    Check(paths::NandDirectory("n3ds") == root + "/data/nand/n3ds", "虚拟 NAND 目录");
+    Check(paths::NandDirectory("3ds") == root + "/data/nand/3ds", "虚拟 NAND 目录");
     Check(paths::BiosDirectory("ps1") == root + "/system/bios/ps1", "BIOS/固件目录");
     Check(paths::DatabaseDirectory() == root + "/system/database", "游戏数据库目录");
     Check(paths::ThemeDirectory("cream") == root + "/media/themes/cream", "主题目录");
@@ -170,6 +171,47 @@ void TestDataPaths() {
     Check(paths::ThumbnailDirectory("gba") == root + "/media/thumbnails/gba", "缩略图目录");
     Check(paths::CoreFilePath("mgba", ".nro") == root + "/cores/mgba.nro", "核心文件路径");
     Check(paths::CacheDirectory("shader") == root + "/cache/shader", "缓存目录");
+
+    // 机种目录名（3DS 用 "3ds"，不是 n3ds）
+    Check(std::string(jzp::MachineKey(jzp::Machine::N3DS)) == "3ds", "MachineKey(3DS) == \"3ds\"");
+    Check(std::string(jzp::MachineKey(jzp::Machine::PS1)) == "ps1" &&
+              std::string(jzp::MachineKey(jzp::Machine::ARCADE)) == "arcade",
+          "MachineKey 其它机种");
+    bool keysUnique = true;
+    std::vector<std::string> seenKeys;
+    for (const jzp::Machine machine : jzp::kAllMachines) {
+        std::string key = jzp::MachineKey(machine);
+        if (key != paths::NormalizeKey(key) || key.empty()) {
+            keysUnique = false;
+        }
+        for (const std::string& existing : seenKeys) {
+            if (existing == key) {
+                keysUnique = false;
+            }
+        }
+        seenKeys.push_back(key);
+    }
+    Check(keysUnique && seenKeys.size() == 15, "15 个机种 key 唯一且已是规范化形式");
+    Check(paths::PlatformConfigPath(jzp::MachineKey(jzp::Machine::N3DS)) ==
+              root + "/config/platforms/3ds.json",
+          "机种 key 直接用于配置路径");
+
+    // 可执行文件位置
+    const std::string exe = paths::ExecutablePath();
+    Check(!exe.empty() && paths::IsAbsolute(exe), "获取可执行文件路径（本平台）");
+    Check(paths::FileExists(exe), "可执行文件路径真实存在");
+    Check(paths::FileName(exe) == "utils_smoke", "可执行文件名正确");
+    Check(paths::ExecutableDirectory() == paths::ParentDirectory(exe), "可执行文件所在目录");
+    const std::string defaultRoot = paths::DefaultDataRoot();
+    if (!defaultRoot.empty()) {
+        Check(defaultRoot == paths::Join(paths::ExecutableDirectory(), paths::kAppDirectoryName),
+              "默认数据根 = 可执行文件目录/JiaoZiPi");
+        Check(paths::DefaultResourceRoot() ==
+                  paths::Join(paths::ExecutableDirectory(), "resources"),
+              "默认资源根 = 可执行文件目录/resources");
+    } else {
+        Check(true, "本平台数据根由平台层提供（DefaultDataRoot 返回空）");
+    }
 
     Check(paths::EnsureAllDirectories(), "预创建全部顶层目录");
     bool allRoots = true;

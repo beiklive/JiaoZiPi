@@ -1,18 +1,32 @@
 #include "DataPaths.h"
 
 #include <cerrno>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <utility>
+#include <vector>
 
 #if defined(_WIN32)
 #include <direct.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <windows.h>
 #else
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <unistd.h>
+#endif
+
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#include <mach-o/dyld.h>
+#endif
+
+// iOS / tvOS / watchOS：可执行文件在 App 包内，数据根要用沙盒路径，不能从可执行文件推导
+#if defined(__APPLE__) && defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE
+#define JZP_PATHS_MOBILE_APPLE 1
 #endif
 
 namespace paths {
@@ -386,6 +400,121 @@ std::string CoreFilePath(std::string_view core, std::string_view extension) {
 std::string CacheDirectory(std::string_view name) {
     const std::string base = DataPath(sub::kCache);
     return name.empty() ? base : Join(base, NormalizeKey(name));
+}
+
+// ---------------------------------------------------------------------------
+// 可执行文件位置
+// ---------------------------------------------------------------------------
+namespace {
+
+// Switch 等平台没有 /proc/self/exe，只能靠 argv[0]（hbmenu 传的是 .nro 完整路径）
+std::string PathFromArgv(int argc, char** argv) {
+    if (argv == nullptr || argc < 1 || argv[0] == nullptr) {
+        return std::string();
+    }
+    return Normalize(argv[0]);
+}
+
+#if defined(_WIN32)
+std::string WideToUtf8(const wchar_t* text) {
+    if (text == nullptr) {
+        return std::string();
+    }
+    const int size = WideCharToMultiByte(CP_UTF8, 0, text, -1, nullptr, 0, nullptr, nullptr);
+    if (size <= 0) {
+        return std::string();
+    }
+    std::string out(static_cast<std::size_t>(size), '\0');
+    WideCharToMultiByte(CP_UTF8, 0, text, -1, &out[0], size, nullptr, nullptr);
+    out.resize(std::strlen(out.c_str()));
+    return out;
+}
+#endif
+
+}  // namespace
+
+std::string ExecutablePath(int argc, char** argv) {
+#if defined(_WIN32)
+    // GetModuleFileNameW 会在缓冲区不足时截断并返回缓冲区大小，逐步放大重试
+    std::vector<wchar_t> buffer(MAX_PATH);
+    while (buffer.size() <= 32768) {
+        const DWORD written =
+            GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
+        if (written == 0) {
+            break;
+        }
+        if (written < buffer.size() - 1) {
+            const std::string path = Normalize(WideToUtf8(buffer.data()));
+            if (!path.empty()) {
+                return path;
+            }
+            break;
+        }
+        buffer.resize(buffer.size() * 2);
+    }
+    return PathFromArgv(argc, argv);
+#elif defined(__APPLE__) && !defined(JZP_PATHS_MOBILE_APPLE)
+    uint32_t size = 0;
+    _NSGetExecutablePath(nullptr, &size);  // 查询所需长度
+    std::vector<char> buffer(size > 0 ? size : 4096);
+    uint32_t actual = static_cast<uint32_t>(buffer.size());
+    if (_NSGetExecutablePath(buffer.data(), &actual) == 0) {
+        // 解析符号链接，拿到真实路径
+        char resolved[4096];
+        if (realpath(buffer.data(), resolved) != nullptr) {
+            return Normalize(resolved);
+        }
+        return Normalize(buffer.data());
+    }
+    return PathFromArgv(argc, argv);
+#elif defined(__SWITCH__)
+    return PathFromArgv(argc, argv);
+#elif defined(__ANDROID__)
+    return PathFromArgv(argc, argv);
+#else
+    char buffer[4096];
+    const ssize_t length = readlink("/proc/self/exe", buffer, sizeof(buffer) - 1);
+    if (length > 0) {
+        buffer[length] = '\0';
+        return Normalize(buffer);
+    }
+    return PathFromArgv(argc, argv);
+#endif
+}
+
+std::string ExecutableDirectory(int argc, char** argv) {
+    return ParentDirectory(ExecutablePath(argc, argv));
+}
+
+std::string DefaultDataRoot(int argc, char** argv) {
+#if defined(__SWITCH__)
+    (void)argc;
+    (void)argv;
+    return Join("sdmc:/", kAppDirectoryName);
+#elif defined(_WIN32) || defined(__linux__) || (defined(__APPLE__) && !defined(JZP_PATHS_MOBILE_APPLE))
+    const std::string directory = ExecutableDirectory(argc, argv);
+    return directory.empty() ? std::string() : Join(directory, kAppDirectoryName);
+#else
+    // iOS / Android：可执行文件位置与数据根无关，由平台层提供
+    (void)argc;
+    (void)argv;
+    return std::string();
+#endif
+}
+
+std::string DefaultResourceRoot(int argc, char** argv) {
+#if defined(__SWITCH__)
+    (void)argc;
+    (void)argv;
+    return std::string("romfs:/");
+#elif defined(_WIN32) || defined(__linux__) || (defined(__APPLE__) && !defined(JZP_PATHS_MOBILE_APPLE))
+    const std::string directory = ExecutableDirectory(argc, argv);
+    return directory.empty() ? std::string() : Join(directory, "resources");
+#else
+    (void)argc;
+    (void)argv;
+    return std::string();
+#endif
 }
 
 std::string DataRootFromEnvironment(const char* environmentVariable) {

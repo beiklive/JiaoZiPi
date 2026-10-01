@@ -6,16 +6,16 @@ JiaoZiPi 的可写数据（配置、存档、日志、缓存、用户素材）�
 
 | 平台 | 数据根目录 | 解析方式 |
 | --- | --- | --- |
-| Windows | `<可执行文件目录>/JiaoZiPi` | `GetModuleFileNameW()` → 取目录 → 拼 `JiaoZiPi` |
-| macOS | `<可执行文件目录>/JiaoZiPi` | `_NSGetExecutablePath()` → 取目录 → 拼 `JiaoZiPi`（`.app` 内即 `Contents/MacOS/JiaoZiPi`） |
-| Linux | `<可执行文件目录>/JiaoZiPi` | `readlink("/proc/self/exe")` → 取目录 → 拼 `JiaoZiPi` |
+| Windows | `<可执行文件目录>/JiaoZiPi` | `paths::DefaultDataRoot()`（`GetModuleFileNameW()` → 取目录 → 拼 `JiaoZiPi`） |
+| macOS | `<可执行文件目录>/JiaoZiPi` | `paths::DefaultDataRoot()`（`_NSGetExecutablePath()` + `realpath()`；`.app` 内即 `Contents/MacOS/JiaoZiPi`） |
+| Linux | `<可执行文件目录>/JiaoZiPi` | `paths::DefaultDataRoot()`（`readlink("/proc/self/exe")`） |
 | iOS | `<App 沙盒>/Documents/JiaoZiPi` | `FileManager.urls(for: .documentDirectory, in: .userDomainMask)` |
 | Android | `/sdcard/JiaoZiPi` | 固定路径（`/sdcard` = `/storage/emulated/0`，需外部存储权限，见风险） |
-| Switch | `sdmc:/JiaoZiPi` | 固定前缀 |
+| Switch | `sdmc:/JiaoZiPi` | `paths::DefaultDataRoot()` 固定前缀；可执行文件路径需传 `argv`（无 `/proc/self/exe`） |
 
 目录名统一写 `JiaoZiPi`：Linux 区分大小写；Windows / macOS / Switch(FAT/exFAT) 不区分，但保持一致，避免打包与脚本出现两个目录。
 
-**命名区分**：数据目录里的 `platforms/` 指**机种**（`gba` / `psx` / `n3ds` ...，见 [JiaoZiPiMachine.h](../src/utils/JiaoZiPiMachine.h)）；`src/platform/` 指**宿主平台**（Switch / Windows / Android ...）。
+**命名区分**：数据目录里的 `platforms/` 指**机种**（`gba` / `ps1` / `3ds` ...，见 [JiaoZiPiMachine.h](../src/utils/JiaoZiPiMachine.h)）；`src/platform/` 指**宿主平台**（Switch / Windows / Android ...）。
 
 ## 目录布局
 
@@ -55,7 +55,7 @@ JiaoZiPi 的可写数据（配置、存档、日志、缓存、用户素材）�
 | 每个机种的全局配置 | `config/platforms/<机种>.json` |
 | 每个核心的设置 | `config/cores/<核心>.json` |
 | 每个游戏的独立配置 | `config/games/<机种>/<game-id>.json` |
-| 3DS / PSP 虚拟 NAND 与核心自建数据 | `data/nand/<机种>/` |
+| 3DS / PSP 虚拟 NAND 与核心自建数据 | `data/nand/3ds/`、`data/nand/psp/`、… |
 | 其他机种存档 | `data/saves/<机种>/<game-id>.sav` |
 | 即时存档 | `data/states/<机种>/<game-id>.st<槽位>` |
 | BIOS / 固件 | `system/bios/<机种>/` |
@@ -70,7 +70,7 @@ JiaoZiPi 的可写数据（配置、存档、日志、缓存、用户素材）�
 
 ## 命名约定
 
-- **`<机种>`** 用机种枚举小写：`fc` `sfc` `gb` `gbc` `gba` `nds` `n3ds` `ngc` `wii` `md` `ss` `dc` `ps1` `psp` `arcade`
+- **`<机种>`** 用 [`MachineKey()`](../src/utils/JiaoZiPiMachine.h)：`fc` `sfc` `gb` `gbc` `gba` `nds` **`3ds`** `ngc` `wii` `md` `ss` `dc` `ps1` `psp` `arcade`（3DS 是 `3ds`，不是 `n3ds`）
 - **`<game-id>`** 优先用核心上报的稳定 ID（卡带序列号 / 标题 ID / ROM header 校验和）；取不到时退化为「文件名去扩展名 + CRC32 短哈希」。**不要**直接用 ROM 文件名——用户改名会导致存档与配置全部失联
 - 所有拼接片段先经 `paths::NormalizeKey()` 规范化：ASCII 转小写、`[a-z0-9_.-]` 之外的字符换成 `_`、压缩连续 `_`、去掉首部 `.`（防隐藏文件与 `..` 上跳），结果为空时回退 `unknown`
 - 全路径统一正斜杠 `/`，末尾不带分隔符；总深度控制在 4 层内（Windows `MAX_PATH` 260）
@@ -106,13 +106,16 @@ JiaoZiPi 的可写数据（配置、存档、日志、缓存、用户素材）�
 目录的保存、拼接、创建与覆盖解析在 [src/utils/paths](../src/utils/paths/README.md)：
 
 ```cpp
+// 1) 覆盖优先；2) 桌面与 Switch 用可执行文件位置推导；3) iOS/Android 由平台层提供
 std::string root = paths::ResolveDataRootOverride(argc, argv);
-if (root.empty()) root = platform::DefaultDataRoot();   // 平台层只提供默认根
-paths::SetDataRoot(root);
-paths::EnsureDataDirectories();                          // 建 root + config
+if (root.empty()) root = paths::DefaultDataRoot(argc, argv);
+if (root.empty()) root = platform::MobileDataRoot();      // 仅 iOS / Android 需要
 
-std::string save = paths::SaveFilePath("gba", gameId);            // data/saves/gba/<game-id>.sav
-std::string shader = paths::ShaderDirectory(paths::shader::kVulkan); // media/shaders/vulkan
+paths::SetDataRoot(root);
+paths::EnsureDataDirectories();                            // 建 root + config
+
+std::string save   = paths::SaveFilePath(jzp::MachineKey(jzp::Machine::GBA), gameId);
+std::string shader = paths::ShaderDirectory(paths::shader::kVulkan);  // media/shaders/vulkan
 ```
 
-`src/platform/` 只负责算出各平台的默认根路径与只读资源根，不参与目录创建。
+`paths::ExecutablePath()/ExecutableDirectory()` 覆盖 Windows / macOS / Linux / Switch 四个平台（Switch 需要把 `argv` 传进来）；`src/platform/` 只负责 iOS / Android 的数据根、只读资源根，以及只读环境下的降级。

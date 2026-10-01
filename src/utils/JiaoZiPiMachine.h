@@ -190,4 +190,30 @@ constexpr const char* MachineName(Machine m) {
     }
 }
 
+// 数据目录里用的机种名（全小写、无多余前缀），如 config/platforms/<key>.json、
+// data/saves/<key>/、data/nand/<key>/。与 paths::NormalizeKey() 配合使用。
+// 注意 3DS 的 key 是 "3ds"（不是 n3ds），与 UI 短标签 MachineLabel() 的 "3DS" 分开。
+constexpr const char* MachineKey(Machine m) {
+    switch (m) {
+        case Machine::FC:     return "fc";
+        case Machine::SFC:    return "sfc";
+        case Machine::GB:     return "gb";
+        case Machine::GBC:    return "gbc";
+        case Machine::GBA:    return "gba";
+        case Machine::NDS:    return "nds";
+        case Machine::N3DS:   return "3ds";
+        case Machine::NGC:    return "ngc";
+        case Machine::WII:    return "wii";
+        case Machine::MD:     return "md";
+        case Machine::SS:     return "ss";
+        case Machine::DC:     return "dc";
+        case Machine::PS1:    return "ps1";
+        case Machine::PSP:    return "psp";
+        case Machine::ARCADE: return "arcade";
+        case Machine::Unknown:
+        case Machine::Count:
+        default:              return "unknown";
+    }
+}
+
 }  // namespace jzp

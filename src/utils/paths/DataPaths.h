@@ -10,7 +10,7 @@
 //   <root>/cores/
 //   <root>/cache/
 //
-// 注意命名：数据目录里的 platforms 指**机种**（gba / psx / n3ds ...），
+// 注意命名：数据目录里的 platforms 指**机种**（gba / ps1 / 3ds ...），
 // 与 src/platform/ 的宿主平台（Switch / Windows / Android ...）不是一回事。
 //
 // 策略：
@@ -65,6 +65,9 @@ namespace shader {
 constexpr const char* kVulkan = "vulkan";
 constexpr const char* kOpenGl = "opengl";
 }  // namespace shader
+
+// 应用目录名：<可执行文件目录>/JiaoZiPi、sdmc:/JiaoZiPi
+constexpr const char* kAppDirectoryName = "JiaoZiPi";
 
 // 首次启动创建的目录（最小集）
 inline constexpr const char* kStartupDirectories[] = {sub::kConfig};
@@ -158,6 +161,26 @@ std::string OverlayDirectory();                                                /
 std::string ThumbnailDirectory(std::string_view platform);                     // media/thumbnails/<platform>
 std::string CoreFilePath(std::string_view core, std::string_view extension = std::string_view());
 std::string CacheDirectory(std::string_view name = std::string_view());        // cache[/<name>]
+
+// ---------------------------------------------------------------------------
+// 可执行文件位置（Windows / macOS / Linux / Switch）
+// ---------------------------------------------------------------------------
+// 当前进程可执行文件的绝对路径；取不到时返回空串。
+// Switch 没有 /proc/self/exe，必须传 argv（argv[0] 由 hbmenu 给出，形如 "sdmc:/switch/xxx.nro"）；
+// 其它平台传入时作为兜底。
+std::string ExecutablePath(int argc = 0, char** argv = nullptr);
+// 可执行文件所在目录
+std::string ExecutableDirectory(int argc = 0, char** argv = nullptr);
+// 规范里的默认数据根：
+//   Windows / macOS / Linux → <可执行文件目录>/JiaoZiPi
+//   Switch                  → sdmc:/JiaoZiPi
+//   iOS / Android 等无法从可执行文件推导的平台 → 返回空串，由平台层提供
+std::string DefaultDataRoot(int argc = 0, char** argv = nullptr);
+// 默认只读资源根：
+//   Windows / macOS / Linux → <可执行文件目录>/resources
+//   Switch                  → romfs:/
+//   其它平台 → 空串，由平台层提供
+std::string DefaultResourceRoot(int argc = 0, char** argv = nullptr);
 
 // ---------------------------------------------------------------------------
 // 覆盖解析
